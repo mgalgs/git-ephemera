@@ -149,14 +149,17 @@ git fetch origin refs/notes/notestash:refs/notes/notestash
 git config --add remote.origin.fetch '+refs/notes/notestash:refs/notes/notestash'
 ```
 
-## Preserving Notes on Rebase
+## Preserving Notes on Rebase/Amend
 
-Configure git to rewrite notes when rebasing:
+Git notes are attached to commit SHAs. When you rebase or amend, git creates new commits with new SHAs, leaving your notes on the old (orphaned) commits.
+
+Configure git to copy notes to rewritten commits:
 
 ```bash
-git config notes.rewrite.rebase true
 git config notes.rewriteRef refs/notes/notestash
 ```
+
+This enables note preservation for both `git rebase` and `git commit --amend`.
 
 ## Viewing Notes in Git Log
 

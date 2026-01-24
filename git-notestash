@@ -1,0 +1,415 @@
+#!/bin/bash
+
+set -euo pipefail
+
+
+die() {
+    echo "notestash: $*" >&2
+    exit 1
+}
+
+
+usage() {
+    cat <<'EOF'
+Usage: git notestash <command> [options]
+
+Commands:
+  save <path>...   Archive files and store as a git note
+  restore          Extract files from a commit's note
+  show             Display note header/metadata
+  list             List archived filenames without extracting
+
+Options for 'save':
+  --commit <rev>     Target commit (default: HEAD)
+  --message <text>   Optional message stored in header
+  --strict           Fail if any path doesn't exist
+
+Options for 'restore':
+  --commit <rev>     Source commit (default: HEAD)
+  --dest <dir>       Extraction directory (default: .)
+  --force            Overwrite existing files
+  --dry-run          List files without extracting
+
+Options for 'show':
+  --commit <rev>     Source commit (default: HEAD)
+  --header           Print only the header
+  --payload          Print only the base64 payload
+
+Options for 'list':
+  --commit <rev>     Source commit (default: HEAD)
+
+Examples:
+  git notestash save .ai/
+  git notestash save PRD.md PLAN.md
+  git notestash restore --commit abc123
+  git notestash list
+EOF
+}
+
+
+in_git_repo() {
+    git rev-parse --is-inside-work-tree >/dev/null 2>&1
+}
+
+
+resolve_commit() {
+    local rev
+    rev="${1:-HEAD}"
+
+    git rev-parse --verify "${rev}^{commit}" 2>/dev/null
+}
+
+
+notes_show_raw() {
+    local ref
+    local commit
+
+    ref="$1"
+    commit="$2"
+
+    git notes --ref "$ref" show "$commit"
+}
+
+
+# Parses a note into header and payload, storing results in global variables
+# NOTE_HEADER and NOTE_PAYLOAD
+# shellcheck disable=SC2034  # Variables are used by callers
+parse_note() {
+    local note_content="$1"
+    local header=""
+    local payload=""
+    local in_payload=0
+
+    while IFS= read -r line; do
+        if [[ $in_payload -eq 0 && "$line" == "---" ]]; then
+            in_payload=1
+            continue
+        fi
+        if [[ $in_payload -eq 0 ]]; then
+            header="$header$line"$'\n'
+        else
+            payload="$payload$line"
+        fi
+    done <<< "$note_content"
+
+    NOTE_HEADER="$header"
+    NOTE_PAYLOAD="$payload"
+}
+
+
+extract_payload() {
+    local payload="$1"
+    local dest="$2"
+    local force="$3"
+    local dry_run="$4"
+
+    # Remove any whitespace from payload (handles wrapped base64)
+    payload="$(echo "$payload" | tr -d '[:space:]')"
+
+    if [[ $dry_run -eq 1 ]]; then
+        echo "Would extract to: $dest"
+        echo "Files:"
+        echo "$payload" | base64 -d | tar -tzf -
+        return
+    fi
+
+    mkdir -p "$dest"
+
+    if [[ $force -eq 0 ]]; then
+        # Check for file conflicts in archived paths
+        local -a archived_files
+        mapfile -t archived_files < <(echo "$payload" | base64 -d | tar -tzf -)
+        local f
+        for f in "${archived_files[@]}"; do
+            # Skip directory entries (they end with /)
+            [[ "$f" == */ ]] && continue
+            if [[ -e "$dest/$f" ]]; then
+                die "file '$dest/$f' already exists; use --force to overwrite"
+            fi
+        done
+    fi
+
+    echo "$payload" | base64 -d | tar -xzf - -C "$dest"
+    echo "Restored files to $dest"
+}
+
+
+collect_paths() {
+    local strict
+    strict="$1"
+    shift
+
+    local -a patterns
+    patterns=("$@")
+
+    local -a found=()
+
+    local repo_root
+    repo_root="$(git rev-parse --show-toplevel)"
+
+    local pattern
+    for pattern in "${patterns[@]}"; do
+        local -a matches=()
+
+        shopt -s nullglob globstar
+        # shellcheck disable=SC2206  # Intentional glob expansion
+        matches=("$repo_root"/$pattern)
+        shopt -u nullglob globstar
+
+        # Filter to only existing paths
+        local -a existing=()
+        local m
+        for m in "${matches[@]}"; do
+            if [[ -e "$m" ]]; then
+                existing+=("$m")
+            fi
+        done
+
+        if [[ ${#existing[@]} -eq 0 ]]; then
+            if [[ $strict -eq 1 ]]; then
+                die "no files match pattern: $pattern"
+            fi
+            continue
+        fi
+
+        local match
+        for match in "${existing[@]}"; do
+            # If it's a directory, add all files recursively
+            if [[ -d "$match" ]]; then
+                while IFS= read -r -d '' file; do
+                    local rel
+                    rel="${file#"$repo_root"/}"
+                    found+=("$rel")
+                done < <(find "$match" -type f -print0)
+            else
+                local rel
+                rel="${match#"$repo_root"/}"
+                found+=("$rel")
+            fi
+        done
+    done
+
+    if [[ ${#found[@]} -eq 0 ]]; then
+        die "no files to save"
+    fi
+
+    printf '%s\n' "${found[@]}"
+}
+
+
+create_note() {
+    local commit
+    local ref
+    local message
+
+    commit="$1"
+    ref="$2"
+    message="$3"
+    shift 3
+
+    local -a files
+    files=("$@")
+
+    local repo_root
+    repo_root="$(git rev-parse --show-toplevel)"
+
+    local full_sha
+    if ! full_sha="$(resolve_commit "$commit")"; then
+        die "invalid commit: $commit"
+    fi
+
+    local header
+    header="notestashVersion: 1
+encoding: tar+gzip+base64
+createdAt: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+commit: $full_sha"
+
+    if [[ -n "$message" ]]; then
+        header="$header
+message: $message"
+    fi
+
+    header="$header
+paths:"
+
+    local f
+    for f in "${files[@]}"; do
+        header="$header
+  - $f"
+    done
+
+    local payload
+    payload="$(cd "$repo_root" && tar -czf - "${files[@]}" | base64 | tr -d '\n')"
+
+    local note_body
+    note_body="$header
+---
+$payload"
+
+    printf '%s\n' "$note_body" | git notes --ref "$ref" add -f -F - "$full_sha"
+
+    echo "Saved ${#files[@]} file(s) to notes ref '$ref' on commit ${full_sha:0:12}"
+}
+
+
+cmd_save() {
+    local commit="HEAD"
+    local ref="notestash"
+    local message=""
+    local strict=0
+    local -a paths=()
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --commit)
+                if [[ $# -lt 2 ]]; then
+                    die "--commit requires an argument"
+                fi
+                commit="$2"
+                shift 2
+                ;;
+            --message)
+                if [[ $# -lt 2 ]]; then
+                    die "--message requires an argument"
+                fi
+                message="$2"
+                shift 2
+                ;;
+            --strict)
+                strict=1
+                shift
+                ;;
+            --)
+                shift
+                paths+=("$@")
+                break
+                ;;
+            -*)
+                die "unknown option: $1"
+                ;;
+            *)
+                paths+=("$1")
+                shift
+                ;;
+        esac
+    done
+
+    if [[ ${#paths[@]} -eq 0 ]]; then
+        die "no paths specified"
+    fi
+
+    local -a files
+    mapfile -t files < <(collect_paths "$strict" "${paths[@]}")
+
+    create_note "$commit" "$ref" "$message" "${files[@]}"
+}
+
+
+cmd_restore() {
+    local commit="HEAD"
+    local ref="notestash"
+    local dest="."
+    local force=0
+    local dry_run=0
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --commit)
+                if [[ $# -lt 2 ]]; then
+                    die "--commit requires an argument"
+                fi
+                commit="$2"
+                shift 2
+                ;;
+            --dest)
+                if [[ $# -lt 2 ]]; then
+                    die "--dest requires an argument"
+                fi
+                dest="$2"
+                shift 2
+                ;;
+            --force)
+                force=1
+                shift
+                ;;
+            --dry-run)
+                dry_run=1
+                shift
+                ;;
+            -*)
+                die "unknown option: $1"
+                ;;
+            *)
+                die "unexpected argument: $1"
+                ;;
+        esac
+    done
+
+    local full_sha
+    if ! full_sha="$(resolve_commit "$commit")"; then
+        die "invalid commit: $commit"
+    fi
+
+    local note_content
+    if ! note_content="$(git notes --ref "$ref" show "$full_sha" 2>/dev/null)"; then
+        die "no note found on commit $commit"
+    fi
+
+    parse_note "$note_content"
+    extract_payload "$NOTE_PAYLOAD" "$dest" "$force" "$dry_run"
+}
+
+
+cmd_show() {
+    die "show not yet implemented"
+}
+
+
+cmd_list() {
+    die "list not yet implemented"
+}
+
+
+main() {
+    if ! command -v git >/dev/null 2>&1; then
+        die "git is required"
+    fi
+
+    if ! in_git_repo; then
+        die "must be run from within a git repository"
+    fi
+
+    if [[ $# -lt 1 ]]; then
+        usage
+        exit 2
+    fi
+
+    local cmd
+    cmd="$1"
+    shift
+
+    case "$cmd" in
+        -h|--help|help)
+            usage
+            ;;
+        save)
+            cmd_save "$@"
+            ;;
+        restore)
+            cmd_restore "$@"
+            ;;
+        show)
+            cmd_show "$@"
+            ;;
+        list)
+            cmd_list "$@"
+            ;;
+        *)
+            usage
+            die "unknown command: $cmd"
+            ;;
+    esac
+}
+
+
+main "$@"
