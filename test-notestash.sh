@@ -537,7 +537,7 @@ test_fetch_notes_from_remote() {
 
     # Save notestash and push notes to origin
     "$NOTESTASH" save PRD.md >/dev/null
-    git push origin refs/notes/notestash --quiet 2>/dev/null
+    "$NOTESTASH" push >/dev/null 2>&1
 
     # Clone to a new location
     local clone_dir
@@ -552,7 +552,7 @@ test_fetch_notes_from_remote() {
     fi
 
     # Fetch the notes
-    git fetch origin refs/notes/notestash:refs/notes/notestash --quiet 2>/dev/null
+    "$NOTESTASH" fetch >/dev/null 2>&1
 
     # Now restore should work
     "$NOTESTASH" restore >/dev/null
@@ -580,7 +580,7 @@ test_notes_available_after_clone_with_fetch_config() {
     git push origin master --quiet 2>/dev/null
 
     "$NOTESTASH" save PLAN.md >/dev/null
-    git push origin refs/notes/notestash --quiet 2>/dev/null
+    "$NOTESTASH" push >/dev/null 2>&1
 
     # Clone and configure auto-fetch for notes
     local clone_dir
@@ -589,7 +589,7 @@ test_notes_available_after_clone_with_fetch_config() {
     cd "$clone_dir"
 
     # Configure fetch refspec for notes
-    git config --add remote.origin.fetch '+refs/notes/notestash:refs/notes/notestash'
+    "$NOTESTASH" setup-remote origin
 
     # Now fetch should bring in notes
     git fetch origin --quiet 2>/dev/null
@@ -632,14 +632,14 @@ test_multiple_commits_notes_sync() {
 
     # Push everything
     git push origin master --quiet 2>/dev/null
-    git push origin refs/notes/notestash --quiet 2>/dev/null
+    "$NOTESTASH" push origin >/dev/null 2>&1
 
     # Clone and fetch notes
     local clone_dir
     clone_dir="$(mktemp -d)"
     git clone "$origin_dir" "$clone_dir" --quiet 2>/dev/null
     cd "$clone_dir"
-    git fetch origin refs/notes/notestash:refs/notes/notestash --quiet 2>/dev/null
+    "$NOTESTASH" fetch origin >/dev/null 2>&1
 
     # Restore from first commit
     local first_restore

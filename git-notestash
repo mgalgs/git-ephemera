@@ -2,6 +2,9 @@
 
 set -euo pipefail
 
+NOTESTASH_NOTES_REF="refs/notes/notestash"
+NOTESTASH_REMOTE_REFSPEC="+refs/notes/notestash:refs/notes/notestash"
+
 
 die() {
     echo "notestash: $*" >&2
@@ -14,10 +17,13 @@ usage() {
 Usage: git notestash <command> [options]
 
 Commands:
-  save <path>...   Archive files and store as a git note
-  restore          Extract files from a commit's note
-  show             Display note header/metadata
-  list             List archived filenames without extracting
+  save <path>...         Archive files and store as a git note
+  restore                Extract files from a commit's note
+  show                   Display note header/metadata
+  list                   List archived filenames without extracting
+  push [<remote>]        Push notestash notes ref (default: origin)
+  fetch [<remote>]       Fetch notestash notes ref (default: origin)
+  setup-remote [<remote>]  Configure remote fetch refspec for notes (default: origin)
 
 Options for 'save':
   --commit <rev>     Target commit (default: HEAD)
@@ -38,11 +44,23 @@ Options for 'show':
 Options for 'list':
   --commit <rev>     Source commit (default: HEAD)
 
+Options for 'push':
+  <remote>          Remote name (default: origin)
+
+Options for 'fetch':
+  <remote>          Remote name (default: origin)
+
+Options for 'setup-remote':
+  <remote>          Remote name (default: origin)
+
 Examples:
   git notestash save .ai/
   git notestash save PRD.md PLAN.md
   git notestash restore --commit abc123
   git notestash list
+  git notestash push
+  git notestash fetch
+  git notestash setup-remote
 EOF
 }
 
@@ -459,6 +477,60 @@ cmd_list() {
 }
 
 
+require_remote() {
+    local remote="$1"
+
+    if ! git remote get-url "$remote" >/dev/null 2>&1; then
+        die "unknown remote: $remote"
+    fi
+}
+
+
+cmd_push() {
+    local remote="${1:-origin}"
+
+    if [[ $# -gt 1 ]]; then
+        die "unexpected argument: ${2}"
+    fi
+
+    require_remote "$remote"
+
+    git push "$remote" "$NOTESTASH_NOTES_REF"
+}
+
+
+cmd_fetch() {
+    local remote="${1:-origin}"
+
+    if [[ $# -gt 1 ]]; then
+        die "unexpected argument: ${2}"
+    fi
+
+    require_remote "$remote"
+
+    if ! git fetch "$remote" "$NOTESTASH_NOTES_REF:$NOTESTASH_NOTES_REF"; then
+        die "failed to fetch '$NOTESTASH_NOTES_REF' from '$remote' (possible divergence; consider fetching with '$NOTESTASH_REMOTE_REFSPEC' and merging)"
+    fi
+}
+
+
+cmd_setup_remote() {
+    local remote="${1:-origin}"
+
+    if [[ $# -gt 1 ]]; then
+        die "unexpected argument: ${2}"
+    fi
+
+    require_remote "$remote"
+
+    if git config --get-all "remote.${remote}.fetch" | grep -Fxq "$NOTESTASH_REMOTE_REFSPEC"; then
+        return
+    fi
+
+    git config --add "remote.${remote}.fetch" "$NOTESTASH_REMOTE_REFSPEC"
+}
+
+
 main() {
     if ! command -v git >/dev/null 2>&1; then
         die "git is required"
@@ -492,6 +564,15 @@ main() {
             ;;
         list)
             cmd_list "$@"
+            ;;
+        push)
+            cmd_push "$@"
+            ;;
+        fetch)
+            cmd_fetch "$@"
+            ;;
+        setup-remote)
+            cmd_setup_remote "$@"
             ;;
         *)
             usage

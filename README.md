@@ -125,6 +125,18 @@ Display note header/metadata.
 | `--header`       | Print only the header           |
 | `--payload`      | Print only the base64 payload   |
 
+### `push [<remote>]`
+
+Push the `refs/notes/notestash` ref to a remote (default: `origin`).
+
+### `fetch [<remote>]`
+
+Fetch the `refs/notes/notestash` ref from a remote (default: `origin`).
+
+### `setup-remote [<remote>]`
+
+Configure a remote so that a regular `git fetch` will also fetch `refs/notes/notestash` (default: `origin`).
+
 ## How It Works
 
 Git notes are attached directly to commits but stored in a separate ref namespace. `git notestash` uses `refs/notes/notestash`, keeping your stashed files separate from other git notes.
@@ -134,19 +146,24 @@ Git notes are attached directly to commits but stored in a separate ref namespac
 ### Push notes to remote
 
 ```bash
-git push origin refs/notes/notestash
+git notestash push        # defaults to origin
+# or: git notestash push <remote>
 ```
 
 ### Fetch notes from remote
 
 ```bash
-git fetch origin refs/notes/notestash:refs/notes/notestash
+git notestash fetch       # defaults to origin
+# or: git notestash fetch <remote>
 ```
 
 ### Auto-fetch notes
 
+Configure the remote so that a regular `git fetch` will also fetch `refs/notes/notestash`:
+
 ```bash
-git config --add remote.origin.fetch '+refs/notes/notestash:refs/notes/notestash'
+git notestash setup-remote        # defaults to origin
+# or: git notestash setup-remote <remote>
 ```
 
 ## Preserving Notes on Rebase/Amend
