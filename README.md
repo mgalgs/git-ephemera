@@ -63,6 +63,40 @@ cp git-notestash ~/.local/bin/
 
 Git automatically discovers executables named `git-*` as subcommands.
 
+## Quickstart
+
+One-time (recommended) repo setup:
+
+```bash
+# 1) Make notes follow rebases/amends (otherwise notes stay on old SHAs)
+git config notes.rewriteRef refs/notes/notestash
+
+# 2) Make normal `git fetch` also fetch the notestash notes ref
+git notestash setup-remote   # defaults to origin
+```
+
+Typical day-to-day flow:
+
+```bash
+git commit -m "..."
+
+# Attach ephemeral files to the commit as a note
+git notestash save .ai/
+
+# Share notes with collaborators/other machines
+git notestash push
+```
+
+On a fresh clone / other machine:
+
+```bash
+git notestash setup-remote
+
+git fetch     # now also fetches refs/notes/notestash
+
+git notestash restore   # restores from HEAD by default
+```
+
 ## Usage
 
 ### Save files to current commit
