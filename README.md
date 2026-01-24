@@ -20,21 +20,32 @@ It's often helpful to save these files for future reference, but typically not d
 
 `git notestash` solves this by attaching them to commits as git notes.
 
-Example workflow:
+### Example workflow
+
+#### Step 1: Start work on a new feature by creating `.ai/{PRD,PLAN,PROMPT}.md`
+
+(typically with the help of an LLM)
+
+#### Step 2: Once those are ready, iterate on the implementation
 
 ```
-# Step 1: Start work on a new feature by creating .ai/{PRD,PLAN,PROMPT}.md with the help of an LLM
-
-# Step 2: Once those are ready, iterate on the implementation:
 claude < .ai/PROMPT.md  # or in a loop for full ralph wiggum goodness
+```
 
-# Step 3: Commit work and stash ephemeral files in the commit notes
-git add ...affected files...
-# (Remember: don't add anything from .ai/ to git!)
+#### Step 3: Commit work and stash ephemeral files in the commit notes
+
+```
+git add ...affected source files...  # _not_ the ephemeral files!
 git commit -m "..."
 git notestash save .ai/
+```
 
-# Continue iterating (goto Step 2). When implementation is finally complete, clean up the ephemeral files (which are now safely stashed in the commits that they were used to generate)
+If you need to continue iterating, goto Step 2.
+
+#### Push notes and clean up the ephemeral files
+
+```
+git notestash push
 rm -rf .ai/*
 ```
 
