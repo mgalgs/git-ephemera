@@ -469,6 +469,55 @@ and tabs:	here"
 }
 
 # =============================================================================
+# Show/List command tests
+# =============================================================================
+
+test_show_default_outputs_header() {
+    echo "# Test" > test.md
+    git add test.md
+    git commit -m "initial" --quiet
+
+    "$NOTESTASH" save test.md >/dev/null
+
+    local output
+    output="$("$NOTESTASH" show 2>&1)"
+
+    echo "$output" | grep -q "notestashVersion: 1" && \
+    echo "$output" | grep -q "encoding: tar+gzip+base64" && \
+    echo "$output" | grep -q "paths:" && \
+    ! echo "$output" | grep -q "^---$"
+}
+
+test_show_payload_outputs_only_payload() {
+    echo "# Test content" > test.md
+    git add test.md
+    git commit -m "initial" --quiet
+
+    "$NOTESTASH" save test.md >/dev/null
+
+    local payload
+    payload="$("$NOTESTASH" show --payload)"
+
+    # Should be decodable and contain our file
+    ! echo "$payload" | grep -q "notestashVersion" && \
+    echo "$payload" | base64 -d | tar -tzf - | grep -q "test.md"
+}
+
+test_list_outputs_filenames() {
+    mkdir -p .ai
+    echo "# PRD" > .ai/PRD.md
+    git add .ai/PRD.md
+    git commit -m "initial" --quiet
+
+    "$NOTESTASH" save .ai/ >/dev/null
+
+    local output
+    output="$("$NOTESTASH" list)"
+
+    echo "$output" | grep -q "\.ai/PRD.md"
+}
+
+# =============================================================================
 # Remote/clone integration tests
 # =============================================================================
 
@@ -655,6 +704,11 @@ main() {
     run_test test_restore_dry_run
     run_test test_restore_no_note_fails
     run_test test_restore_preserves_file_content
+
+    # Show/List tests
+    run_test test_show_default_outputs_header
+    run_test test_show_payload_outputs_only_payload
+    run_test test_list_outputs_filenames
 
     # Remote/clone integration tests
     run_test test_fetch_notes_from_remote

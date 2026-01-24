@@ -361,12 +361,101 @@ cmd_restore() {
 
 
 cmd_show() {
-    die "show not yet implemented"
+    local commit="HEAD"
+    local ref="notestash"
+    local show_header=0
+    local show_payload=0
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --commit)
+                if [[ $# -lt 2 ]]; then
+                    die "--commit requires an argument"
+                fi
+                commit="$2"
+                shift 2
+                ;;
+            --header)
+                show_header=1
+                shift
+                ;;
+            --payload)
+                show_payload=1
+                shift
+                ;;
+            -* )
+                die "unknown option: $1"
+                ;;
+            *)
+                die "unexpected argument: $1"
+                ;;
+        esac
+    done
+
+    if [[ $show_header -eq 1 && $show_payload -eq 1 ]]; then
+        die "--header and --payload are mutually exclusive"
+    fi
+
+    local full_sha
+    if ! full_sha="$(resolve_commit "$commit")"; then
+        die "invalid commit: $commit"
+    fi
+
+    local note_content
+    if ! note_content="$(git notes --ref "$ref" show "$full_sha" 2>/dev/null)"; then
+        die "no note found on commit $commit"
+    fi
+
+    parse_note "$note_content"
+
+    if [[ $show_payload -eq 1 ]]; then
+        printf '%s\n' "$NOTE_PAYLOAD"
+        return
+    fi
+
+    # Default output is header only.
+    printf '%s' "$NOTE_HEADER"
 }
 
 
 cmd_list() {
-    die "list not yet implemented"
+    local commit="HEAD"
+    local ref="notestash"
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --commit)
+                if [[ $# -lt 2 ]]; then
+                    die "--commit requires an argument"
+                fi
+                commit="$2"
+                shift 2
+                ;;
+            -* )
+                die "unknown option: $1"
+                ;;
+            *)
+                die "unexpected argument: $1"
+                ;;
+        esac
+    done
+
+    local full_sha
+    if ! full_sha="$(resolve_commit "$commit")"; then
+        die "invalid commit: $commit"
+    fi
+
+    local note_content
+    if ! note_content="$(git notes --ref "$ref" show "$full_sha" 2>/dev/null)"; then
+        die "no note found on commit $commit"
+    fi
+
+    parse_note "$note_content"
+
+    local payload
+    payload="$(echo "$NOTE_PAYLOAD" | tr -d '[:space:]')"
+
+    echo "$payload" | base64 -d | tar -tzf -
 }
 
 
