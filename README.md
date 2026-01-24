@@ -101,6 +101,56 @@ git notestash restore   # restores from HEAD by default
 
 ## Usage
 
+```
+Usage: git notestash <command> [options]
+
+Commands:
+  save <path>...         Archive files and store as a git note
+  restore                Extract files from a commit's note
+  show                   Display note header/metadata
+  list                   List archived filenames without extracting
+  push [<remote>]        Push notestash notes ref (default: origin)
+  fetch [<remote>]       Fetch notestash notes ref (default: origin)
+  setup-remote [<remote>]  Configure remote fetch refspec for notes (default: origin)
+
+Options for 'save':
+  --commit <rev>     Target commit (default: HEAD)
+  --message <text>   Optional message stored in header
+  --strict           Fail if any path doesn't exist
+
+Options for 'restore':
+  --commit <rev>     Source commit (default: HEAD)
+  --dest <dir>       Extraction directory (default: .)
+  --force            Overwrite existing files
+  --dry-run          List files without extracting
+
+Options for 'show':
+  --commit <rev>     Source commit (default: HEAD)
+  --header           Print only the header
+  --payload          Print only the base64 payload
+
+Options for 'list':
+  --commit <rev>     Source commit (default: HEAD)
+
+Options for 'push':
+  <remote>          Remote name (default: origin)
+
+Options for 'fetch':
+  <remote>          Remote name (default: origin)
+
+Options for 'setup-remote':
+  <remote>          Remote name (default: origin)
+
+Examples:
+  git notestash save .ai/
+  git notestash save PRD.md PLAN.md
+  git notestash restore --commit abc123
+  git notestash list
+  git notestash push
+  git notestash fetch
+  git notestash setup-remote
+```
+
 ### Save files to current commit
 
 ```bash
