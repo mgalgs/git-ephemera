@@ -16,13 +16,13 @@ context files, e.g.:
 .ai/specs/*.md
 ```
 
-It's often helpful to save these files for future reference, but typically not desirable to check them in to source control since they become out-of-date quickly; they mainly make sense in the context of the commit that they were used to create.
+It's often helpful to save these files for future reference, but typically not desirable to have them in the main source worktree since they become out-of-date quickly, polluting code search results and cluttering agent context. They mainly make sense in the context of the commit that they were used to create.
 
 `git notestash` solves this by attaching them to commits as git notes.
 
-### Example workflow
+### Example workflow using the [Ralph Wiggum technique](https://github.com/ClaytonFarr/ralph-playbook)
 
-#### Step 1: Start work on a new feature by creating `.ai/{PRD,PLAN,PROMPT}.md`
+#### Step 1: Start work on a new feature by creating `.ai/{PRD,PLAN,PROMPT}.md` (or similar)
 
 (typically with the help of an LLM)
 
@@ -35,18 +35,20 @@ claude < .ai/PROMPT.md  # or in a loop for full ralph wiggum goodness
 #### Step 3: Commit work and stash ephemeral files in the commit notes
 
 ```
-git add ...affected source files...  # _not_ the ephemeral files!
+git add ...affected source files...  # _not_ the ephemeral files! i.e. nothing under .ai/
 git commit -m "..."
+# Now stash the .ai/ files on the newly created commit for tracking
 git notestash save .ai/
 ```
 
 If you need to continue iterating, goto Step 2.
 
-#### Push notes and clean up the ephemeral files
+#### Push work and notes and clean up the ephemeral files
 
 ```
-git notestash push
-rm -rf .ai/*
+git push  # push your actual code changes
+git notestash push  # push your notestash
+rm -rf .ai/*  # clean up notes in worktree to make room for the next task
 ```
 
 ## Installation
