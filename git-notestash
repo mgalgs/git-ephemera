@@ -502,7 +502,7 @@ cmd_push() {
 
     require_remote "$remote"
 
-    git push "$remote" "$NOTESTASH_NOTES_REF"
+    git push --no-verify "$remote" "$NOTESTASH_NOTES_REF"
 }
 
 
