@@ -51,12 +51,12 @@ teardown() {
 
 pass() {
     TESTS_PASSED=$((TESTS_PASSED + 1))
-    printf "%sPASS%s: %s\n" "$GREEN" "$NC" "$1"
+    printf "%bPASS%b: %s\n" "$GREEN" "$NC" "$1"
 }
 
 fail() {
     TESTS_FAILED=$((TESTS_FAILED + 1))
-    printf "%sFAIL%s: %s\n" "$RED" "$NC" "$1"
+    printf "%bFAIL%b: %s\n" "$RED" "$NC" "$1"
     if [[ -n "${2:-}" ]]; then
         printf "      %s\n" "$2"
     fi
@@ -975,13 +975,13 @@ main() {
     echo ""
     echo "========================================="
     echo "Tests run:    $TESTS_RUN"
-    printf "Tests passed: %s%d%s\n" "$GREEN" "$TESTS_PASSED" "$NC"
+    printf "Tests passed: %b%d%b\n" "$GREEN" "$TESTS_PASSED" "$NC"
     if [[ $TESTS_FAILED -gt 0 ]]; then
-        printf "Tests failed: %s%d%s\n" "$RED" "$TESTS_FAILED" "$NC"
+        printf "Tests failed: %b%d%b\n" "$RED" "$TESTS_FAILED" "$NC"
         exit 1
     else
         echo "Tests failed: $TESTS_FAILED"
-        printf "%sAll tests passed!%s\n" "$GREEN" "$NC"
+        printf "%bAll tests passed!%b\n" "$GREEN" "$NC"
     fi
 }
 
