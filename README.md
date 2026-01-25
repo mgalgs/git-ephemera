@@ -43,6 +43,8 @@ git notestash save .ai/
 
 If you need to continue iterating, goto Step 2.
 
+(In a fully automated setup these commands are part of the prompt/plan).
+
 #### Push work and notes and clean up the ephemeral files
 
 ```
