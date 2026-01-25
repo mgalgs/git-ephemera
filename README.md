@@ -77,6 +77,9 @@ git config notes.rewriteRef refs/notes/notestash
 
 # 2) Make normal `git fetch` also fetch the notestash notes ref
 git notestash setup-remote   # defaults to origin
+
+# 3) Install the post-rewrite hook to track rebase/amend history in notes
+git notestash install-hooks
 ```
 
 Typical day-to-day flow:
@@ -114,6 +117,8 @@ Commands:
   push [<remote>]        Push notestash notes ref (default: origin)
   fetch [<remote>]       Fetch notestash notes ref (default: origin)
   setup-remote [<remote>]  Configure remote fetch refspec for notes (default: origin)
+  install-hooks          Install post-rewrite hook for commit rewrite tracking
+  record-rewrite         Record commit rewrite history (used by post-rewrite hook)
 
 Options for 'save':
   --commit <rev>     Target commit (default: HEAD)
@@ -143,6 +148,12 @@ Options for 'fetch':
 Options for 'setup-remote':
   <remote>          Remote name (default: origin)
 
+Options for 'install-hooks':
+  --force           Overwrite existing post-rewrite hook
+
+Options for 'record-rewrite':
+  --ref <notes>     Notes ref to update (default: notestash)
+
 Examples:
   git notestash save .ai/
   git notestash save PRD.md PLAN.md
@@ -151,6 +162,7 @@ Examples:
   git notestash push
   git notestash fetch
   git notestash setup-remote
+  git notestash install-hooks
 ```
 
 ### Save files to current commit
@@ -235,6 +247,26 @@ Fetch the `refs/notes/notestash` ref from a remote (default: `origin`).
 ### `setup-remote [<remote>]`
 
 Configure a remote so that a regular `git fetch` will also fetch `refs/notes/notestash` (default: `origin`).
+
+### `install-hooks`
+
+Install the `post-rewrite` git hook to automatically track commit rewrites. This ensures that when you run `git rebase` or `git commit --amend`, the rewritten commits' notes get updated with their commit history.
+
+| Option      | Description                              |
+|-------------|------------------------------------------|
+| `--force`   | Overwrite existing `post-rewrite` hook  |
+
+The hook calls `git notestash record-rewrite` internally when rewrites occur. If a `post-rewrite` hook already exists, use `--force` to overwrite it, or manually add the `git notestash record-rewrite` call to your existing hook.
+
+### `record-rewrite`
+
+Record commit rewrite history in notestash notes. This is typically called by the `post-rewrite` hook.
+
+| Option            | Description                              |
+|-------------------|------------------------------------------|
+| `--ref <notes>`   | Notes ref to update (default: `notestash`) |
+
+This command reads `old_sha new_sha` pairs from stdin (the format provided by Git's `post-rewrite` hook) and updates the note on `new_sha` to include `old_sha` in its `commitHistory` field.
 
 ## How It Works
 
