@@ -7,6 +7,10 @@
 
 set -euo pipefail
 
+# Isolate tests from user/system git config
+export GIT_CONFIG_GLOBAL=/dev/null
+export GIT_CONFIG_NOSYSTEM=1
+
 # Path to the script under test (absolute)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NOTESTASH="$SCRIPT_DIR/git-notestash"
