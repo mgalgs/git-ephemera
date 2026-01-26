@@ -20,39 +20,6 @@ It's often helpful to save these files for future reference, but typically not d
 
 `git notestash` solves this by attaching them to commits as git notes.
 
-### Example workflow using the [Ralph Wiggum technique](https://github.com/ClaytonFarr/ralph-playbook)
-
-#### Step 1: Start work on a new feature by creating `.ai/{PRD,PLAN,PROMPT}.md` (or similar)
-
-(typically with the help of an LLM)
-
-#### Step 2: Once those are ready, iterate on the implementation
-
-```
-claude < .ai/PROMPT.md  # or in a loop for full ralph wiggum goodness
-```
-
-#### Step 3: Commit work and stash ephemeral files in the commit notes
-
-```
-git add ...affected source files...  # _not_ the ephemeral files! i.e. nothing under .ai/
-git commit -m "..."
-# Now stash the .ai/ files on the newly created commit for tracking
-git notestash save .ai/
-```
-
-If you need to continue iterating, goto Step 2.
-
-(In a fully automated setup these commands are part of the prompt/plan).
-
-#### Push work and notes and clean up the ephemeral files
-
-```
-git push  # push your actual code changes
-git notestash push  # push your notestash
-rm -rf .ai/*  # clean up notes in worktree to make room for the next task
-```
-
 ## Installation
 
 Place `git-notestash` on your PATH:
@@ -193,6 +160,39 @@ git notestash list --commit abc123
 ```bash
 git notestash show
 git notestash show --commit abc123
+```
+
+### Full example workflow using the [Ralph Wiggum technique](https://github.com/ClaytonFarr/ralph-playbook)
+
+#### Step 1: Start work on a new feature by creating `.ai/{PRD,PLAN,PROMPT}.md` (or similar)
+
+(typically with the help of an LLM)
+
+#### Step 2: Once those are ready, iterate on the implementation
+
+```
+claude < .ai/PROMPT.md  # or in a loop for full ralph wiggum goodness
+```
+
+#### Step 3: Commit work and stash ephemeral files in the commit notes
+
+```
+git add ...affected source files...  # _not_ the ephemeral files! i.e. nothing under .ai/
+git commit -m "..."
+# Now stash the .ai/ files on the newly created commit for tracking
+git notestash save .ai/
+```
+
+If you need to continue iterating, goto Step 2.
+
+(In a fully automated setup these commands are part of the prompt/plan).
+
+#### Push work and notes and clean up the ephemeral files
+
+```
+git push  # push your actual code changes
+git notestash push  # push your notestash
+rm -rf .ai/*  # clean up notes in worktree to make room for the next task
 ```
 
 ## Commands
