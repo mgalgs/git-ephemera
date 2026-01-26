@@ -57,6 +57,9 @@ git commit -m "..."
 # Attach ephemeral files to the commit as a note
 git notestash save .ai/
 
+# Attach ephemera to a commit other than HEAD
+git notestash save .ai/ --commit <rev>
+
 # Share notes with collaborators/other machines
 git notestash push
 ```
@@ -65,10 +68,14 @@ On a fresh clone / other machine:
 
 ```bash
 git notestash setup-remote
-
 git fetch     # now also fetches refs/notes/notestash
+git notestash install-hooks  # Ensure rewrites (rebase, amend) also fix note references
 
-git notestash restore   # restores from HEAD by default
+# Restore ephemera
+git notestash restore
+
+# Restore ephemera from a commit other than HEAD
+git notestash restore --commit <rev>
 ```
 
 ## Usage
