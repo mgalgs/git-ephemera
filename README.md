@@ -47,6 +47,7 @@ git ephemera setup-remote
 git ephemera setup-remote torvalds   # for remote other than "origin"
 
 # 3) Install the post-rewrite hook to track rebase/amend history in notes
+#    (Rewrites only your notes, doesn't touch your commits.)
 git ephemera install-hooks
 ```
 
