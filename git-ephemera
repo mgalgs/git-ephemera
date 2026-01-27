@@ -531,10 +531,12 @@ cmd_setup_remote() {
     require_remote "$remote"
 
     if git config --get-all "remote.${remote}.fetch" | grep -Fxq "$EPHEMERA_REMOTE_REFSPEC"; then
+        echo "Remote '$remote' already configured to fetch ephemera notes (see .git/config)"
         return
     fi
 
     git config --add "remote.${remote}.fetch" "$EPHEMERA_REMOTE_REFSPEC"
+    echo "Configured '$remote' to fetch ephemera notes refs (see .git/config)"
 }
 
 
