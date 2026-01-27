@@ -43,7 +43,8 @@ One-time (recommended) repo setup:
 git config notes.rewriteRef refs/notes/ephemera
 
 # 2) Make normal `git fetch` also fetch the ephemera notes ref
-git ephemera setup-remote   # defaults to origin
+git ephemera setup-remote
+git ephemera setup-remote torvalds   # for remote other than "origin"
 
 # 3) Install the post-rewrite hook to track rebase/amend history in notes
 git ephemera install-hooks
