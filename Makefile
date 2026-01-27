@@ -3,7 +3,7 @@
 all: check test
 
 test:
-	./test-notestash.sh
+	./test-ephemera.sh
 
 check lint:
-	shellcheck git-notestash test-notestash.sh
+	shellcheck git-ephemera test-ephemera.sh

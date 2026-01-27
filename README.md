@@ -1,10 +1,10 @@
-# git-notestash
+# git-ephemera
 
 Attach ephemeral development files to git commits via git notes.
 
 ## Overview
 
-`git notestash` captures ephemeral development files (PRDs, plans, specs, scratch notes, etc.) and stores them on the relevant git commit using `git notes`. This keeps development artifacts versioned and attributable to commits without polluting your repository tree or branch history.
+`git ephemera` captures ephemeral development files (PRDs, plans, specs, scratch notes, etc.) and stores them on the relevant git commit using `git notes`. This keeps development artifacts versioned and attributable to commits without polluting your repository tree or branch history.
 
 For example, an AI-assisted development flow often results in accumulated
 context files, e.g.:
@@ -18,18 +18,18 @@ context files, e.g.:
 
 It's often helpful to save these files for future reference, but typically not desirable to have them in the main source worktree since they become out-of-date quickly, polluting code search results and cluttering agent context. They mainly make sense in the context of the commit that they were used to create.
 
-`git notestash` solves this by attaching them to commits as git notes.
+`git ephemera` solves this by attaching them to commits as git notes.
 
 ## Installation
 
-Place `git-notestash` on your PATH:
+Place `git-ephemera` on your PATH:
 
 ```bash
 # Symlink (recommended for development)
-ln -s /path/to/git-notestash ~/.local/bin/git-notestash
+ln -s /path/to/git-ephemera ~/.local/bin/git-ephemera
 
 # Or copy
-cp git-notestash ~/.local/bin/
+cp git-ephemera ~/.local/bin/
 ```
 
 Git automatically discovers executables named `git-*` as subcommands.
@@ -40,13 +40,13 @@ One-time (recommended) repo setup:
 
 ```bash
 # 1) Make notes follow rebases/amends (otherwise notes stay on old SHAs)
-git config notes.rewriteRef refs/notes/notestash
+git config notes.rewriteRef refs/notes/ephemera
 
-# 2) Make normal `git fetch` also fetch the notestash notes ref
-git notestash setup-remote   # defaults to origin
+# 2) Make normal `git fetch` also fetch the ephemera notes ref
+git ephemera setup-remote   # defaults to origin
 
 # 3) Install the post-rewrite hook to track rebase/amend history in notes
-git notestash install-hooks
+git ephemera install-hooks
 ```
 
 Typical day-to-day flow:
@@ -55,41 +55,41 @@ Typical day-to-day flow:
 git commit -m "..."
 
 # Attach ephemeral files to the commit as a note
-git notestash save .ai/
+git ephemera save .ai/
 
 # Attach ephemera to a commit other than HEAD
-git notestash save .ai/ --commit <rev>
+git ephemera save .ai/ --commit <rev>
 
 # Share notes with collaborators/other machines
-git notestash push
+git ephemera push
 ```
 
 On a fresh clone / other machine:
 
 ```bash
-git notestash setup-remote
-git fetch     # now also fetches refs/notes/notestash
-git notestash install-hooks  # Ensure rewrites (rebase, amend) also fix note references
+git ephemera setup-remote
+git fetch     # now also fetches refs/notes/ephemera
+git ephemera install-hooks  # Ensure rewrites (rebase, amend) also fix note references
 
 # Restore ephemera
-git notestash restore
+git ephemera restore
 
 # Restore ephemera from a commit other than HEAD
-git notestash restore --commit <rev>
+git ephemera restore --commit <rev>
 ```
 
 ## Usage
 
 ```
-Usage: git notestash <command> [options]
+Usage: git ephemera <command> [options]
 
 Commands:
   save <path>...         Archive files and store as a git note
   restore                Extract files from a commit's note
   show                   Display note header/metadata
   list                   List archived filenames without extracting
-  push [<remote>]        Push notestash notes ref (default: origin)
-  fetch [<remote>]       Fetch notestash notes ref (default: origin)
+  push [<remote>]        Push ephemera notes ref (default: origin)
+  fetch [<remote>]       Fetch ephemera notes ref (default: origin)
   setup-remote [<remote>]  Configure remote fetch refspec for notes (default: origin)
   install-hooks          Install post-rewrite hook for commit rewrite tracking
   record-rewrite         Record commit rewrite history (used by post-rewrite hook)
@@ -126,47 +126,47 @@ Options for 'install-hooks':
   --force           Overwrite existing post-rewrite hook
 
 Options for 'record-rewrite':
-  --ref <notes>     Notes ref to update (default: notestash)
+  --ref <notes>     Notes ref to update (default: ephemera)
 
 Examples:
-  git notestash save .ai/
-  git notestash save PRD.md PLAN.md
-  git notestash restore --commit abc123
-  git notestash list
-  git notestash push
-  git notestash fetch
-  git notestash setup-remote
-  git notestash install-hooks
+  git ephemera save .ai/
+  git ephemera save PRD.md PLAN.md
+  git ephemera restore --commit abc123
+  git ephemera list
+  git ephemera push
+  git ephemera fetch
+  git ephemera setup-remote
+  git ephemera install-hooks
 ```
 
 ### Save files to current commit
 
 ```bash
-git notestash save .ai/
-git notestash save PRD.md PLAN.md
-git notestash save 'specs/*.md'
+git ephemera save .ai/
+git ephemera save PRD.md PLAN.md
+git ephemera save 'specs/*.md'
 ```
 
 ### Restore files from a commit
 
 ```bash
-git notestash restore
-git notestash restore --commit abc123
-git notestash restore --dest /tmp/restored
+git ephemera restore
+git ephemera restore --commit abc123
+git ephemera restore --dest /tmp/restored
 ```
 
 ### List archived files
 
 ```bash
-git notestash list
-git notestash list --commit abc123
+git ephemera list
+git ephemera list --commit abc123
 ```
 
 ### Show note metadata
 
 ```bash
-git notestash show
-git notestash show --commit abc123
+git ephemera show
+git ephemera show --commit abc123
 ```
 
 ### Full example workflow using the [Ralph Wiggum technique](https://github.com/ClaytonFarr/ralph-playbook)
@@ -187,7 +187,7 @@ claude < .ai/PROMPT.md  # or in a loop for full ralph wiggum goodness
 git add ...affected source files...  # _not_ the ephemeral files! i.e. nothing under .ai/
 git commit -m "..."
 # Now stash the .ai/ files on the newly created commit for tracking
-git notestash save .ai/
+git ephemera save .ai/
 ```
 
 If you need to continue iterating, goto Step 2.
@@ -198,7 +198,7 @@ If you need to continue iterating, goto Step 2.
 
 ```
 git push  # push your actual code changes
-git notestash push  # push your notestash
+git ephemera push  # push your ephemera
 rm -rf .ai/*  # clean up notes in worktree to make room for the next task
 ```
 
@@ -245,15 +245,15 @@ Display note header/metadata.
 
 ### `push [<remote>]`
 
-Push the `refs/notes/notestash` ref to a remote (default: `origin`).
+Push the `refs/notes/ephemera` ref to a remote (default: `origin`).
 
 ### `fetch [<remote>]`
 
-Fetch the `refs/notes/notestash` ref from a remote (default: `origin`).
+Fetch the `refs/notes/ephemera` ref from a remote (default: `origin`).
 
 ### `setup-remote [<remote>]`
 
-Configure a remote so that a regular `git fetch` will also fetch `refs/notes/notestash` (default: `origin`).
+Configure a remote so that a regular `git fetch` will also fetch `refs/notes/ephemera` (default: `origin`).
 
 ### `install-hooks`
 
@@ -263,45 +263,45 @@ Install the `post-rewrite` git hook to automatically track commit rewrites. This
 |-------------|------------------------------------------|
 | `--force`   | Overwrite existing `post-rewrite` hook  |
 
-The hook calls `git notestash record-rewrite` internally when rewrites occur. If a `post-rewrite` hook already exists, use `--force` to overwrite it, or manually add the `git notestash record-rewrite` call to your existing hook.
+The hook calls `git ephemera record-rewrite` internally when rewrites occur. If a `post-rewrite` hook already exists, use `--force` to overwrite it, or manually add the `git ephemera record-rewrite` call to your existing hook.
 
 ### `record-rewrite`
 
-Record commit rewrite history in notestash notes. This is typically called by the `post-rewrite` hook.
+Record commit rewrite history in ephemera notes. This is typically called by the `post-rewrite` hook.
 
 | Option            | Description                              |
 |-------------------|------------------------------------------|
-| `--ref <notes>`   | Notes ref to update (default: `notestash`) |
+| `--ref <notes>`   | Notes ref to update (default: `ephemera`) |
 
 This command reads `old_sha new_sha` pairs from stdin (the format provided by Git's `post-rewrite` hook) and updates the note on `new_sha` to include `old_sha` in its `commitHistory` field.
 
 ## How It Works
 
-Git notes are attached directly to commits but stored in a separate ref namespace. `git notestash` uses `refs/notes/notestash`, keeping your stashed files separate from other git notes.
+Git notes are attached directly to commits but stored in a separate ref namespace. `git ephemera` uses `refs/notes/ephemera`, keeping your stashed files separate from other git notes.
 
 ## Syncing Notes
 
 ### Push notes to remote
 
 ```bash
-git notestash push        # defaults to origin
-# or: git notestash push <remote>
+git ephemera push        # defaults to origin
+# or: git ephemera push <remote>
 ```
 
 ### Fetch notes from remote
 
 ```bash
-git notestash fetch       # defaults to origin
-# or: git notestash fetch <remote>
+git ephemera fetch       # defaults to origin
+# or: git ephemera fetch <remote>
 ```
 
 ### Auto-fetch notes
 
-Configure the remote so that a regular `git fetch` will also fetch `refs/notes/notestash`:
+Configure the remote so that a regular `git fetch` will also fetch `refs/notes/ephemera`:
 
 ```bash
-git notestash setup-remote        # defaults to origin
-# or: git notestash setup-remote <remote>
+git ephemera setup-remote        # defaults to origin
+# or: git ephemera setup-remote <remote>
 ```
 
 ## Preserving Notes on Rebase/Amend
@@ -311,7 +311,7 @@ Git notes are attached to commit SHAs. When you rebase or amend, git creates new
 Configure git to copy notes to rewritten commits:
 
 ```bash
-git config notes.rewriteRef refs/notes/notestash
+git config notes.rewriteRef refs/notes/ephemera
 ```
 
 This enables note preservation for both `git rebase` and `git commit --amend`.
@@ -319,7 +319,7 @@ This enables note preservation for both `git rebase` and `git commit --amend`.
 ## Viewing Notes in Git Log
 
 ```bash
-git log --show-notes=notestash
+git log --show-notes=ephemera
 ```
 
 ## Data Format
@@ -327,7 +327,7 @@ git log --show-notes=notestash
 Notes are stored as text with a YAML-like header followed by a base64-encoded tar.gz payload:
 
 ```
-notestashVersion: 1
+ephemeraVersion: 1
 encoding: tar+gzip+base64
 createdAt: 2026-01-24T12:34:56Z
 commit: abc123...

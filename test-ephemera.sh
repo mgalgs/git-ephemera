@@ -1,8 +1,8 @@
 #!/bin/bash
 #
-# Unit tests for git-notestash
+# Unit tests for git-ephemera
 #
-# Run from the repo root: ./test-notestash.sh
+# Run from the repo root: ./test-ephemera.sh
 #
 
 set -euo pipefail
@@ -13,7 +13,7 @@ export GIT_CONFIG_NOSYSTEM=1
 
 # Path to the script under test (absolute)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-NOTESTASH="$SCRIPT_DIR/git-notestash"
+EPHEMERA="$SCRIPT_DIR/git-ephemera"
 
 # Test counters
 TESTS_RUN=0
@@ -87,10 +87,10 @@ test_save_single_file() {
     git add PRD.md
     git commit -m "initial" --quiet
 
-    "$NOTESTASH" save PRD.md >/dev/null
+    "$EPHEMERA" save PRD.md >/dev/null
 
     # Verify note exists
-    git notes --ref notestash show HEAD >/dev/null 2>&1
+    git notes --ref ephemera show HEAD >/dev/null 2>&1
 }
 
 test_save_multiple_files() {
@@ -99,10 +99,10 @@ test_save_multiple_files() {
     git add PRD.md PLAN.md
     git commit -m "initial" --quiet
 
-    "$NOTESTASH" save PRD.md PLAN.md >/dev/null
+    "$EPHEMERA" save PRD.md PLAN.md >/dev/null
 
     local note
-    note="$(git notes --ref notestash show HEAD)"
+    note="$(git notes --ref ephemera show HEAD)"
 
     # Check both files are in the paths
     echo "$note" | grep -q "PRD.md" && echo "$note" | grep -q "PLAN.md"
@@ -115,10 +115,10 @@ test_save_directory() {
     git add .ai
     git commit -m "initial" --quiet
 
-    "$NOTESTASH" save .ai/ >/dev/null
+    "$EPHEMERA" save .ai/ >/dev/null
 
     local note
-    note="$(git notes --ref notestash show HEAD)"
+    note="$(git notes --ref ephemera show HEAD)"
 
     echo "$note" | grep -q ".ai/PRD.md" && echo "$note" | grep -q ".ai/PLAN.md"
 }
@@ -130,10 +130,10 @@ test_save_glob_pattern() {
     git add .
     git commit -m "initial" --quiet
 
-    "$NOTESTASH" save 'PRD_*.md' >/dev/null
+    "$EPHEMERA" save 'PRD_*.md' >/dev/null
 
     local note
-    note="$(git notes --ref notestash show HEAD)"
+    note="$(git notes --ref ephemera show HEAD)"
 
     # Should have both PRD files but not OTHER
     echo "$note" | grep -q "PRD_one.md" && \
@@ -146,10 +146,10 @@ test_save_with_message() {
     git add test.md
     git commit -m "initial" --quiet
 
-    "$NOTESTASH" save --message "Test save message" test.md >/dev/null
+    "$EPHEMERA" save --message "Test save message" test.md >/dev/null
 
     local note
-    note="$(git notes --ref notestash show HEAD)"
+    note="$(git notes --ref ephemera show HEAD)"
 
     echo "$note" | grep -q "message: Test save message"
 }
@@ -166,11 +166,11 @@ test_save_to_specific_commit() {
     git commit -m "second" --quiet
 
     # Save to the first commit
-    "$NOTESTASH" save --commit "$first_sha" first.md >/dev/null
+    "$EPHEMERA" save --commit "$first_sha" first.md >/dev/null
 
     # Note should be on first commit, not HEAD
-    git notes --ref notestash show "$first_sha" >/dev/null 2>&1 && \
-    ! git notes --ref notestash show HEAD >/dev/null 2>&1
+    git notes --ref ephemera show "$first_sha" >/dev/null 2>&1 && \
+    ! git notes --ref ephemera show HEAD >/dev/null 2>&1
 }
 
 test_save_strict_mode_fails_on_missing() {
@@ -179,7 +179,7 @@ test_save_strict_mode_fails_on_missing() {
     git commit -m "initial" --quiet
 
     # Should fail in strict mode when file doesn't exist
-    if "$NOTESTASH" save --strict nonexistent.md >/dev/null 2>&1; then
+    if "$EPHEMERA" save --strict nonexistent.md >/dev/null 2>&1; then
         return 1  # Should have failed
     fi
     return 0
@@ -191,10 +191,10 @@ test_save_nonstrict_ignores_missing() {
     git commit -m "initial" --quiet
 
     # Should succeed, saving only the existing file
-    "$NOTESTASH" save exists.md nonexistent.md >/dev/null
+    "$EPHEMERA" save exists.md nonexistent.md >/dev/null
 
     local note
-    note="$(git notes --ref notestash show HEAD)"
+    note="$(git notes --ref ephemera show HEAD)"
     echo "$note" | grep -q "exists.md"
 }
 
@@ -203,7 +203,7 @@ test_save_no_paths_fails() {
     git add test.md
     git commit -m "initial" --quiet
 
-    if "$NOTESTASH" save >/dev/null 2>&1; then
+    if "$EPHEMERA" save >/dev/null 2>&1; then
         return 1  # Should have failed
     fi
     return 0
@@ -214,17 +214,17 @@ test_save_overwrites_existing_note() {
     git add test.md
     git commit -m "initial" --quiet
 
-    "$NOTESTASH" save test.md >/dev/null
+    "$EPHEMERA" save test.md >/dev/null
     local first_note
-    first_note="$(git notes --ref notestash show HEAD)"
+    first_note="$(git notes --ref ephemera show HEAD)"
 
     # Wait a second so timestamp differs
     sleep 1
 
     echo "# Version 2" > test.md
-    "$NOTESTASH" save test.md >/dev/null
+    "$EPHEMERA" save test.md >/dev/null
     local second_note
-    second_note="$(git notes --ref notestash show HEAD)"
+    second_note="$(git notes --ref ephemera show HEAD)"
 
     # Notes should be different (different createdAt at minimum)
     [[ "$first_note" != "$second_note" ]]
@@ -235,12 +235,12 @@ test_note_format_has_required_fields() {
     git add test.md
     git commit -m "initial" --quiet
 
-    "$NOTESTASH" save test.md >/dev/null
+    "$EPHEMERA" save test.md >/dev/null
 
     local note
-    note="$(git notes --ref notestash show HEAD)"
+    note="$(git notes --ref ephemera show HEAD)"
 
-    echo "$note" | grep -q "notestashVersion: 1" && \
+    echo "$note" | grep -q "ephemeraVersion: 1" && \
     echo "$note" | grep -q "encoding: tar+gzip+base64" && \
     echo "$note" | grep -q "createdAt:" && \
     echo "$note" | grep -q "commit:" && \
@@ -253,10 +253,10 @@ test_payload_is_valid_base64_targz() {
     git add test.md
     git commit -m "initial" --quiet
 
-    "$NOTESTASH" save test.md >/dev/null
+    "$EPHEMERA" save test.md >/dev/null
 
     local note
-    note="$(git notes --ref notestash show HEAD)"
+    note="$(git notes --ref ephemera show HEAD)"
 
     # Extract payload (everything after ---)
     local payload
@@ -272,10 +272,10 @@ test_payload_preserves_file_content() {
     git add test.md
     git commit -m "initial" --quiet
 
-    "$NOTESTASH" save test.md >/dev/null
+    "$EPHEMERA" save test.md >/dev/null
 
     local note
-    note="$(git notes --ref notestash show HEAD)"
+    note="$(git notes --ref ephemera show HEAD)"
 
     local payload
     payload="$(echo "$note" | sed -n '/^---$/,$ p' | tail -n +2 | tr -d '\n')"
@@ -296,7 +296,7 @@ test_requires_git_repo() {
     local tmpdir
     tmpdir="$(mktemp -d)"
     cd "$tmpdir"
-    if "$NOTESTASH" save test.md >/dev/null 2>&1; then
+    if "$EPHEMERA" save test.md >/dev/null 2>&1; then
         rm -rf "$tmpdir"
         return 1  # Should have failed
     fi
@@ -310,7 +310,7 @@ test_help_shows_usage() {
     git add test.md
     git commit -m "initial" --quiet
 
-    "$NOTESTASH" --help 2>&1 | grep -qi "usage"
+    "$EPHEMERA" --help 2>&1 | grep -qi "usage"
 }
 
 # =============================================================================
@@ -322,11 +322,11 @@ test_restore_single_file() {
     git add test.md
     git commit -m "initial" --quiet
 
-    "$NOTESTASH" save test.md >/dev/null
+    "$EPHEMERA" save test.md >/dev/null
 
     # Remove the file and restore it
     rm test.md
-    "$NOTESTASH" restore >/dev/null
+    "$EPHEMERA" restore >/dev/null
 
     # File should be restored
     [[ -f test.md ]] && grep -q "Test content" test.md
@@ -338,10 +338,10 @@ test_restore_multiple_files() {
     git add PRD.md PLAN.md
     git commit -m "initial" --quiet
 
-    "$NOTESTASH" save PRD.md PLAN.md >/dev/null
+    "$EPHEMERA" save PRD.md PLAN.md >/dev/null
 
     rm PRD.md PLAN.md
-    "$NOTESTASH" restore >/dev/null
+    "$EPHEMERA" restore >/dev/null
 
     [[ -f PRD.md ]] && [[ -f PLAN.md ]]
 }
@@ -353,10 +353,10 @@ test_restore_directory_structure() {
     git add .ai
     git commit -m "initial" --quiet
 
-    "$NOTESTASH" save .ai/ >/dev/null
+    "$EPHEMERA" save .ai/ >/dev/null
 
     rm -rf .ai
-    "$NOTESTASH" restore >/dev/null
+    "$EPHEMERA" restore >/dev/null
 
     [[ -f .ai/PRD.md ]] && [[ -f .ai/specs/feature.md ]]
 }
@@ -366,11 +366,11 @@ test_restore_to_custom_dest() {
     git add test.md
     git commit -m "initial" --quiet
 
-    "$NOTESTASH" save test.md >/dev/null
+    "$EPHEMERA" save test.md >/dev/null
 
     local restore_dir
     restore_dir="$(mktemp -d)"
-    "$NOTESTASH" restore --dest "$restore_dir" >/dev/null
+    "$EPHEMERA" restore --dest "$restore_dir" >/dev/null
 
     [[ -f "$restore_dir/test.md" ]]
     rm -rf "$restore_dir"
@@ -382,16 +382,16 @@ test_restore_from_specific_commit() {
     git commit -m "first" --quiet
     local first_sha
     first_sha="$(git rev-parse HEAD)"
-    "$NOTESTASH" save first.md >/dev/null
+    "$EPHEMERA" save first.md >/dev/null
 
     echo "# Second" > second.md
     git add second.md
     git commit -m "second" --quiet
-    "$NOTESTASH" save second.md >/dev/null
+    "$EPHEMERA" save second.md >/dev/null
 
     local restore_dir
     restore_dir="$(mktemp -d)"
-    "$NOTESTASH" restore --commit "$first_sha" --dest "$restore_dir" >/dev/null
+    "$EPHEMERA" restore --commit "$first_sha" --dest "$restore_dir" >/dev/null
 
     # Should have first.md, not second.md
     [[ -f "$restore_dir/first.md" ]] && [[ ! -f "$restore_dir/second.md" ]]
@@ -403,10 +403,10 @@ test_restore_fails_on_existing_file() {
     git add test.md
     git commit -m "initial" --quiet
 
-    "$NOTESTASH" save test.md >/dev/null
+    "$EPHEMERA" save test.md >/dev/null
 
     # File already exists, should fail without --force
-    if "$NOTESTASH" restore >/dev/null 2>&1; then
+    if "$EPHEMERA" restore >/dev/null 2>&1; then
         return 1  # Should have failed
     fi
     return 0
@@ -417,13 +417,13 @@ test_restore_force_overwrites() {
     git add test.md
     git commit -m "initial" --quiet
 
-    "$NOTESTASH" save test.md >/dev/null
+    "$EPHEMERA" save test.md >/dev/null
 
     # Modify the file
     echo "# Modified" > test.md
 
     # Restore with --force should overwrite
-    "$NOTESTASH" restore --force >/dev/null
+    "$EPHEMERA" restore --force >/dev/null
 
     grep -q "Original" test.md
 }
@@ -433,11 +433,11 @@ test_restore_dry_run() {
     git add test.md
     git commit -m "initial" --quiet
 
-    "$NOTESTASH" save test.md >/dev/null
+    "$EPHEMERA" save test.md >/dev/null
     rm test.md
 
     local output
-    output="$("$NOTESTASH" restore --dry-run 2>&1)"
+    output="$("$EPHEMERA" restore --dry-run 2>&1)"
 
     # Dry run should list files without restoring
     echo "$output" | grep -q "test.md" && [[ ! -f test.md ]]
@@ -449,7 +449,7 @@ test_restore_no_note_fails() {
     git commit -m "initial" --quiet
 
     # No save was done, restore should fail
-    if "$NOTESTASH" restore >/dev/null 2>&1; then
+    if "$EPHEMERA" restore >/dev/null 2>&1; then
         return 1  # Should have failed
     fi
     return 0
@@ -463,9 +463,9 @@ and tabs:	here"
     git add test.md
     git commit -m "initial" --quiet
 
-    "$NOTESTASH" save test.md >/dev/null
+    "$EPHEMERA" save test.md >/dev/null
     rm test.md
-    "$NOTESTASH" restore >/dev/null
+    "$EPHEMERA" restore >/dev/null
 
     local restored
     restored="$(cat test.md)"
@@ -481,12 +481,12 @@ test_show_default_outputs_header() {
     git add test.md
     git commit -m "initial" --quiet
 
-    "$NOTESTASH" save test.md >/dev/null
+    "$EPHEMERA" save test.md >/dev/null
 
     local output
-    output="$("$NOTESTASH" show 2>&1)"
+    output="$("$EPHEMERA" show 2>&1)"
 
-    echo "$output" | grep -q "notestashVersion: 1" && \
+    echo "$output" | grep -q "ephemeraVersion: 1" && \
     echo "$output" | grep -q "encoding: tar+gzip+base64" && \
     echo "$output" | grep -q "paths:" && \
     ! echo "$output" | grep -q "^---$"
@@ -497,13 +497,13 @@ test_show_payload_outputs_only_payload() {
     git add test.md
     git commit -m "initial" --quiet
 
-    "$NOTESTASH" save test.md >/dev/null
+    "$EPHEMERA" save test.md >/dev/null
 
     local payload
-    payload="$("$NOTESTASH" show --payload)"
+    payload="$("$EPHEMERA" show --payload)"
 
     # Should be decodable and contain our file
-    ! echo "$payload" | grep -q "notestashVersion" && \
+    ! echo "$payload" | grep -q "ephemeraVersion" && \
     echo "$payload" | base64 -d | tar -tzf - | grep -q "test.md"
 }
 
@@ -513,10 +513,10 @@ test_list_outputs_filenames() {
     git add .ai/PRD.md
     git commit -m "initial" --quiet
 
-    "$NOTESTASH" save .ai/ >/dev/null
+    "$EPHEMERA" save .ai/ >/dev/null
 
     local output
-    output="$("$NOTESTASH" list)"
+    output="$("$EPHEMERA" list)"
 
     echo "$output" | grep -q "\.ai/PRD.md"
 }
@@ -526,7 +526,7 @@ test_list_outputs_filenames() {
 # =============================================================================
 
 test_fetch_notes_from_remote() {
-    # Create origin repo with a notestash
+    # Create origin repo with a ephemera
     local origin_dir
     origin_dir="$(mktemp -d)"
     git clone --bare . "$origin_dir" --quiet 2>/dev/null
@@ -539,9 +539,9 @@ test_fetch_notes_from_remote() {
     git commit -m "add PRD" --quiet
     git push origin master --quiet 2>/dev/null
 
-    # Save notestash and push notes to origin
-    "$NOTESTASH" save PRD.md >/dev/null
-    "$NOTESTASH" push >/dev/null 2>&1
+    # Save ephemera and push notes to origin
+    "$EPHEMERA" save PRD.md >/dev/null
+    "$EPHEMERA" push >/dev/null 2>&1
 
     # Clone to a new location
     local clone_dir
@@ -550,16 +550,16 @@ test_fetch_notes_from_remote() {
     cd "$clone_dir"
 
     # Notes should NOT be there yet (git clone doesn't fetch notes by default)
-    if "$NOTESTASH" restore --dry-run >/dev/null 2>&1; then
+    if "$EPHEMERA" restore --dry-run >/dev/null 2>&1; then
         rm -rf "$origin_dir" "$clone_dir"
         return 1  # Notes shouldn't be available yet
     fi
 
     # Fetch the notes
-    "$NOTESTASH" fetch >/dev/null 2>&1
+    "$EPHEMERA" fetch >/dev/null 2>&1
 
     # Now restore should work
-    "$NOTESTASH" restore >/dev/null
+    "$EPHEMERA" restore >/dev/null
 
     local result=0
     if [[ ! -f PRD.md ]] || ! grep -q "PRD content" PRD.md; then
@@ -583,8 +583,8 @@ test_notes_available_after_clone_with_fetch_config() {
     git commit -m "add PLAN" --quiet
     git push origin master --quiet 2>/dev/null
 
-    "$NOTESTASH" save PLAN.md >/dev/null
-    "$NOTESTASH" push >/dev/null 2>&1
+    "$EPHEMERA" save PLAN.md >/dev/null
+    "$EPHEMERA" push >/dev/null 2>&1
 
     # Clone and configure auto-fetch for notes
     local clone_dir
@@ -593,7 +593,7 @@ test_notes_available_after_clone_with_fetch_config() {
     cd "$clone_dir"
 
     # Configure fetch refspec for notes
-    "$NOTESTASH" setup-remote origin
+    "$EPHEMERA" setup-remote origin
 
     # Now fetch should bring in notes
     git fetch origin --quiet 2>/dev/null
@@ -601,7 +601,7 @@ test_notes_available_after_clone_with_fetch_config() {
     # Restore should work
     local restore_dir
     restore_dir="$(mktemp -d)"
-    "$NOTESTASH" restore --dest "$restore_dir" >/dev/null
+    "$EPHEMERA" restore --dest "$restore_dir" >/dev/null
 
     local result=0
     if [[ ! -f "$restore_dir/PLAN.md" ]] || ! grep -q "Plan content" "$restore_dir/PLAN.md"; then
@@ -620,40 +620,40 @@ test_multiple_commits_notes_sync() {
 
     git remote add origin "$origin_dir"
 
-    # First commit with notestash
+    # First commit with ephemera
     echo "# First PRD" > PRD.md
     git add PRD.md
     git commit -m "first" --quiet
     local first_sha
     first_sha="$(git rev-parse HEAD)"
-    "$NOTESTASH" save PRD.md >/dev/null
+    "$EPHEMERA" save PRD.md >/dev/null
 
-    # Second commit with different notestash
+    # Second commit with different ephemera
     echo "# Second PRD" > PRD.md
     git add PRD.md
     git commit -m "second" --quiet
-    "$NOTESTASH" save PRD.md >/dev/null
+    "$EPHEMERA" save PRD.md >/dev/null
 
     # Push everything
     git push origin master --quiet 2>/dev/null
-    "$NOTESTASH" push origin >/dev/null 2>&1
+    "$EPHEMERA" push origin >/dev/null 2>&1
 
     # Clone and fetch notes
     local clone_dir
     clone_dir="$(mktemp -d)"
     git clone "$origin_dir" "$clone_dir" --quiet 2>/dev/null
     cd "$clone_dir"
-    "$NOTESTASH" fetch origin >/dev/null 2>&1
+    "$EPHEMERA" fetch origin >/dev/null 2>&1
 
     # Restore from first commit
     local first_restore
     first_restore="$(mktemp -d)"
-    "$NOTESTASH" restore --commit "$first_sha" --dest "$first_restore" >/dev/null
+    "$EPHEMERA" restore --commit "$first_sha" --dest "$first_restore" >/dev/null
 
     # Restore from second commit (HEAD)
     local second_restore
     second_restore="$(mktemp -d)"
-    "$NOTESTASH" restore --dest "$second_restore" >/dev/null
+    "$EPHEMERA" restore --dest "$second_restore" >/dev/null
 
     local result=0
     if ! grep -q "First PRD" "$first_restore/PRD.md"; then
@@ -672,14 +672,14 @@ test_multiple_commits_notes_sync() {
 # =============================================================================
 
 test_record_rewrite_updates_commit_history() {
-    # Create initial commit with notestash
+    # Create initial commit with ephemera
     echo "# Initial" > test.md
     git add test.md
     git commit -m "initial" --quiet
     local old_sha
     old_sha="$(git rev-parse HEAD)"
 
-    "$NOTESTASH" save test.md >/dev/null
+    "$EPHEMERA" save test.md >/dev/null
 
     # Simulate a rewrite (amend)
     echo "# Updated" >> test.md
@@ -690,30 +690,30 @@ test_record_rewrite_updates_commit_history() {
 
     # Manually move note (simulating git notes rewrite behavior)
     local note_content
-    note_content="$(git notes --ref notestash show "$old_sha")"
-    printf '%s\n' "$note_content" | git notes --ref notestash add -F - "$new_sha"
-    git notes --ref notestash remove "$old_sha" 2>/dev/null || true
+    note_content="$(git notes --ref ephemera show "$old_sha")"
+    printf '%s\n' "$note_content" | git notes --ref ephemera add -F - "$new_sha"
+    git notes --ref ephemera remove "$old_sha" 2>/dev/null || true
 
     # Run record-rewrite
-    echo "$old_sha $new_sha" | "$NOTESTASH" record-rewrite >/dev/null
+    echo "$old_sha $new_sha" | "$EPHEMERA" record-rewrite >/dev/null
 
     # Verify commitHistory is in the note
     local updated_note
-    updated_note="$("$NOTESTASH" show --commit "$new_sha" 2>&1)"
+    updated_note="$("$EPHEMERA" show --commit "$new_sha" 2>&1)"
 
     echo "$updated_note" | grep -q "^commitHistory:" && \
     echo "$updated_note" | grep -qF "$old_sha"
 }
 
 test_record_rewrite_idempotent() {
-    # Create initial commit with notestash
+    # Create initial commit with ephemera
     echo "# Test" > test.md
     git add test.md
     git commit -m "initial" --quiet
     local old_sha
     old_sha="$(git rev-parse HEAD)"
 
-    "$NOTESTASH" save test.md >/dev/null
+    "$EPHEMERA" save test.md >/dev/null
 
     # Simulate a rewrite
     git commit --amend --no-edit --quiet
@@ -722,17 +722,17 @@ test_record_rewrite_idempotent() {
 
     # Move note manually
     local note_content
-    note_content="$(git notes --ref notestash show "$old_sha")"
-    printf '%s\n' "$note_content" | git notes --ref notestash add -F - "$new_sha"
-    git notes --ref notestash remove "$old_sha" 2>/dev/null || true
+    note_content="$(git notes --ref ephemera show "$old_sha")"
+    printf '%s\n' "$note_content" | git notes --ref ephemera add -F - "$new_sha"
+    git notes --ref ephemera remove "$old_sha" 2>/dev/null || true
 
     # Run record-rewrite twice
-    echo "$old_sha $new_sha" | "$NOTESTASH" record-rewrite >/dev/null
-    echo "$old_sha $new_sha" | "$NOTESTASH" record-rewrite >/dev/null
+    echo "$old_sha $new_sha" | "$EPHEMERA" record-rewrite >/dev/null
+    echo "$old_sha $new_sha" | "$EPHEMERA" record-rewrite >/dev/null
 
     # Check that old_sha appears only once in commitHistory
     local updated_note
-    updated_note="$("$NOTESTASH" show --commit "$new_sha" 2>&1)"
+    updated_note="$("$EPHEMERA" show --commit "$new_sha" 2>&1)"
 
     # Count occurrences of old_sha in commitHistory section
     local count
@@ -751,20 +751,20 @@ test_record_rewrite_handles_old_notes_without_history() {
     original_sha="$(git rev-parse HEAD)"
 
     # Save a note
-    "$NOTESTASH" save test.md >/dev/null
+    "$EPHEMERA" save test.md >/dev/null
 
     # Get the note content and remove commitHistory to simulate old format
     local note_content
-    note_content="$(git notes --ref notestash show "$original_sha")"
+    note_content="$(git notes --ref ephemera show "$original_sha")"
     local old_format_note
     old_format_note="$(echo "$note_content" | sed '/^commitHistory:/d')"
 
     # Force-add old format note back
-    printf '%s\n' "$old_format_note" | git notes --ref notestash add -f -F - "$original_sha"
+    printf '%s\n' "$old_format_note" | git notes --ref ephemera add -f -F - "$original_sha"
 
     # Verify old format note doesn't have commitHistory
     local check_note
-    check_note="$(git notes --ref notestash show "$original_sha")"
+    check_note="$(git notes --ref ephemera show "$original_sha")"
     if echo "$check_note" | grep -q "^commitHistory:"; then
         return 1  # commitHistory should not exist
     fi
@@ -777,34 +777,34 @@ test_record_rewrite_handles_old_notes_without_history() {
 
     # Manually copy the old-format note to the rewritten commit
     # (simulating what git's notes.rewriteRef would do)
-    printf '%s\n' "$old_format_note" | git notes --ref notestash add -f -F - "$rewritten_sha"
+    printf '%s\n' "$old_format_note" | git notes --ref ephemera add -f -F - "$rewritten_sha"
 
     # Run record-rewrite with original_sha -> rewritten_sha
-    echo "$original_sha $rewritten_sha" | "$NOTESTASH" record-rewrite >/dev/null
+    echo "$original_sha $rewritten_sha" | "$EPHEMERA" record-rewrite >/dev/null
 
     # Verify commitHistory is now present
     local updated_note
-    updated_note="$("$NOTESTASH" show --commit "$rewritten_sha" 2>&1)"
+    updated_note="$("$EPHEMERA" show --commit "$rewritten_sha" 2>&1)"
 
     echo "$updated_note" | grep -q "^commitHistory:" && \
     echo "$updated_note" | grep -qF "$original_sha"
 }
 test_record_rewrite_multiple_commits() {
-    # Create first commit with notestash
+    # Create first commit with ephemera
     echo "# First" > first.md
     git add first.md
     git commit -m "first" --quiet
     local first_old
     first_old="$(git rev-parse HEAD)"
-    "$NOTESTASH" save first.md >/dev/null
+    "$EPHEMERA" save first.md >/dev/null
 
-    # Create second commit with notestash
+    # Create second commit with ephemera
     echo "# Second" > second.md
     git add second.md
     git commit -m "second" --quiet
     local second_old
     second_old="$(git rev-parse HEAD)"
-    "$NOTESTASH" save second.md >/dev/null
+    "$EPHEMERA" save second.md >/dev/null
 
     # Amend both - first amend second commit, then simulate first being rewritten
     git commit --amend --no-edit --quiet
@@ -818,23 +818,23 @@ test_record_rewrite_multiple_commits() {
 
     # Move notes manually with force
     local note_content
-    note_content="$(git notes --ref notestash show "$first_old")"
-    printf '%s\n' "$note_content" | git notes --ref notestash add -f -F - "$first_new"
-    git notes --ref notestash remove "$first_old" 2>/dev/null || true
+    note_content="$(git notes --ref ephemera show "$first_old")"
+    printf '%s\n' "$note_content" | git notes --ref ephemera add -f -F - "$first_new"
+    git notes --ref ephemera remove "$first_old" 2>/dev/null || true
 
-    note_content="$(git notes --ref notestash show "$second_old")"
-    printf '%s\n' "$note_content" | git notes --ref notestash add -f -F - "$second_new"
-    git notes --ref notestash remove "$second_old" 2>/dev/null || true
+    note_content="$(git notes --ref ephemera show "$second_old")"
+    printf '%s\n' "$note_content" | git notes --ref ephemera add -f -F - "$second_new"
+    git notes --ref ephemera remove "$second_old" 2>/dev/null || true
 
     # Run record-rewrite for both pairs
-    echo "$first_old $first_new" | "$NOTESTASH" record-rewrite >/dev/null
-    echo "$second_old $second_new" | "$NOTESTASH" record-rewrite >/dev/null
+    echo "$first_old $first_new" | "$EPHEMERA" record-rewrite >/dev/null
+    echo "$second_old $second_new" | "$EPHEMERA" record-rewrite >/dev/null
 
     # Verify both notes have commitHistory
     local first_note
-    first_note="$("$NOTESTASH" show --commit "$first_new" 2>&1)"
+    first_note="$("$EPHEMERA" show --commit "$first_new" 2>&1)"
     local second_note
-    second_note="$("$NOTESTASH" show --commit "$second_new" 2>&1)"
+    second_note="$("$EPHEMERA" show --commit "$second_new" 2>&1)"
 
     echo "$first_note" | grep -qF "$first_old" && \
     echo "$second_note" | grep -qF "$second_old"
@@ -845,22 +845,22 @@ test_record_rewrite_multiple_commits() {
 # =============================================================================
 
 test_install_hooks_creates_post_rewrite_hook() {
-    "$NOTESTASH" install-hooks >/dev/null
+    "$EPHEMERA" install-hooks >/dev/null
 
     local git_dir
     git_dir="$(git rev-parse --git-dir)"
     local hook_file="$git_dir/hooks/post-rewrite"
 
     [[ -f "$hook_file" ]] && \
-    grep -q "git notestash record-rewrite" "$hook_file"
+    grep -q "git ephemera record-rewrite" "$hook_file"
 }
 
 test_install_hooks_fails_on_second_run() {
     # First run should succeed
-    "$NOTESTASH" install-hooks >/dev/null
+    "$EPHEMERA" install-hooks >/dev/null
 
     # Second run without --force should fail
-    ! "$NOTESTASH" install-hooks >/dev/null 2>&1
+    ! "$EPHEMERA" install-hooks >/dev/null 2>&1
 }
 
 test_install_hooks_fails_with_existing_hook() {
@@ -872,7 +872,7 @@ test_install_hooks_fails_with_existing_hook() {
     echo "# Custom hook" > "$hook_file"
 
     # Should fail
-    if "$NOTESTASH" install-hooks >/dev/null 2>&1; then
+    if "$EPHEMERA" install-hooks >/dev/null 2>&1; then
         return 1  # Should have failed
     fi
     return 0
@@ -887,10 +887,10 @@ test_install_hooks_force_overwrites() {
     echo "# Custom hook" > "$hook_file"
 
     # Should succeed with --force
-    "$NOTESTASH" install-hooks --force >/dev/null
+    "$EPHEMERA" install-hooks --force >/dev/null
 
     # Should now have our invocation
-    grep -q "git notestash record-rewrite" "$hook_file" && \
+    grep -q "git ephemera record-rewrite" "$hook_file" && \
     ! grep -q "# Custom hook" "$hook_file"
 }
 
@@ -899,10 +899,10 @@ test_new_save_has_commit_history_field() {
     git add test.md
     git commit -m "initial" --quiet
 
-    "$NOTESTASH" save test.md >/dev/null
+    "$EPHEMERA" save test.md >/dev/null
 
     local note
-    note="$("$NOTESTASH" show 2>&1)"
+    note="$("$EPHEMERA" show 2>&1)"
 
     echo "$note" | grep -q "^commitHistory: \[\]$"
 }
@@ -912,12 +912,12 @@ test_new_save_has_commit_history_field() {
 # =============================================================================
 
 main() {
-    echo "Running git-notestash tests..."
+    echo "Running git-ephemera tests..."
     echo ""
 
     # Verify script exists
-    if [[ ! -x "$NOTESTASH" ]]; then
-        echo "Error: $NOTESTASH not found or not executable"
+    if [[ ! -x "$EPHEMERA" ]]; then
+        echo "Error: $EPHEMERA not found or not executable"
         exit 1
     fi
 
