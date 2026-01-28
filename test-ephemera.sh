@@ -82,24 +82,24 @@ run_test() {
 # Tests
 # =============================================================================
 
-test_save_single_file() {
+test_add_single_file() {
     echo "# Test PRD" > PRD.md
     git add PRD.md
     git commit -m "initial" --quiet
 
-    "$EPHEMERA" save PRD.md >/dev/null
+    "$EPHEMERA" add PRD.md >/dev/null
 
     # Verify note exists
     git notes --ref ephemera show HEAD >/dev/null 2>&1
 }
 
-test_save_multiple_files() {
+test_add_multiple_files() {
     echo "# PRD" > PRD.md
     echo "# Plan" > PLAN.md
     git add PRD.md PLAN.md
     git commit -m "initial" --quiet
 
-    "$EPHEMERA" save PRD.md PLAN.md >/dev/null
+    "$EPHEMERA" add PRD.md PLAN.md >/dev/null
 
     local note
     note="$(git notes --ref ephemera show HEAD)"
@@ -108,14 +108,14 @@ test_save_multiple_files() {
     echo "$note" | grep -q "PRD.md" && echo "$note" | grep -q "PLAN.md"
 }
 
-test_save_directory() {
+test_add_directory() {
     mkdir -p .ai
     echo "# PRD" > .ai/PRD.md
     echo "# Plan" > .ai/PLAN.md
     git add .ai
     git commit -m "initial" --quiet
 
-    "$EPHEMERA" save .ai/ >/dev/null
+    "$EPHEMERA" add .ai/ >/dev/null
 
     local note
     note="$(git notes --ref ephemera show HEAD)"
@@ -123,14 +123,14 @@ test_save_directory() {
     echo "$note" | grep -q ".ai/PRD.md" && echo "$note" | grep -q ".ai/PLAN.md"
 }
 
-test_save_glob_pattern() {
+test_add_glob_pattern() {
     echo "# PRD 1" > PRD_one.md
     echo "# PRD 2" > PRD_two.md
     echo "# Other" > OTHER.md
     git add .
     git commit -m "initial" --quiet
 
-    "$EPHEMERA" save 'PRD_*.md' >/dev/null
+    "$EPHEMERA" add 'PRD_*.md' >/dev/null
 
     local note
     note="$(git notes --ref ephemera show HEAD)"
@@ -141,20 +141,20 @@ test_save_glob_pattern() {
     ! echo "$note" | grep -q "OTHER.md"
 }
 
-test_save_with_message() {
+test_add_with_message() {
     echo "# Test" > test.md
     git add test.md
     git commit -m "initial" --quiet
 
-    "$EPHEMERA" save --message "Test save message" test.md >/dev/null
+    "$EPHEMERA" add --message "Test add message" test.md >/dev/null
 
     local note
     note="$(git notes --ref ephemera show HEAD)"
 
-    echo "$note" | grep -q "message: Test save message"
+    echo "$note" | grep -q "message: Test add message"
 }
 
-test_save_to_specific_commit() {
+test_add_to_specific_commit() {
     echo "# First" > first.md
     git add first.md
     git commit -m "first" --quiet
@@ -166,55 +166,55 @@ test_save_to_specific_commit() {
     git commit -m "second" --quiet
 
     # Save to the first commit
-    "$EPHEMERA" save --commit "$first_sha" first.md >/dev/null
+    "$EPHEMERA" add --commit "$first_sha" first.md >/dev/null
 
     # Note should be on first commit, not HEAD
     git notes --ref ephemera show "$first_sha" >/dev/null 2>&1 && \
     ! git notes --ref ephemera show HEAD >/dev/null 2>&1
 }
 
-test_save_strict_mode_fails_on_missing() {
+test_add_strict_mode_fails_on_missing() {
     echo "# Test" > exists.md
     git add exists.md
     git commit -m "initial" --quiet
 
     # Should fail in strict mode when file doesn't exist
-    if "$EPHEMERA" save --strict nonexistent.md >/dev/null 2>&1; then
+    if "$EPHEMERA" add --strict nonexistent.md >/dev/null 2>&1; then
         return 1  # Should have failed
     fi
     return 0
 }
 
-test_save_nonstrict_ignores_missing() {
+test_add_nonstrict_ignores_missing() {
     echo "# Test" > exists.md
     git add exists.md
     git commit -m "initial" --quiet
 
     # Should succeed, saving only the existing file
-    "$EPHEMERA" save exists.md nonexistent.md >/dev/null
+    "$EPHEMERA" add exists.md nonexistent.md >/dev/null
 
     local note
     note="$(git notes --ref ephemera show HEAD)"
     echo "$note" | grep -q "exists.md"
 }
 
-test_save_no_paths_fails() {
+test_add_no_paths_fails() {
     echo "# Test" > test.md
     git add test.md
     git commit -m "initial" --quiet
 
-    if "$EPHEMERA" save >/dev/null 2>&1; then
+    if "$EPHEMERA" add >/dev/null 2>&1; then
         return 1  # Should have failed
     fi
     return 0
 }
 
-test_save_overwrites_existing_note() {
+test_add_overwrites_existing_note() {
     echo "# Version 1" > test.md
     git add test.md
     git commit -m "initial" --quiet
 
-    "$EPHEMERA" save test.md >/dev/null
+    "$EPHEMERA" add test.md >/dev/null
     local first_note
     first_note="$(git notes --ref ephemera show HEAD)"
 
@@ -222,11 +222,11 @@ test_save_overwrites_existing_note() {
     sleep 1
 
     echo "# Version 2" > test.md
-    "$EPHEMERA" save test.md >/dev/null
+    "$EPHEMERA" add test.md >/dev/null
     local second_note
     second_note="$(git notes --ref ephemera show HEAD)"
 
-    # Notes should be different (different createdAt at minimum)
+    # Notes should be different (different updatedAt at minimum)
     [[ "$first_note" != "$second_note" ]]
 }
 
@@ -235,7 +235,7 @@ test_note_format_has_required_fields() {
     git add test.md
     git commit -m "initial" --quiet
 
-    "$EPHEMERA" save test.md >/dev/null
+    "$EPHEMERA" add test.md >/dev/null
 
     local note
     note="$(git notes --ref ephemera show HEAD)"
@@ -253,7 +253,7 @@ test_payload_is_valid_base64_targz() {
     git add test.md
     git commit -m "initial" --quiet
 
-    "$EPHEMERA" save test.md >/dev/null
+    "$EPHEMERA" add test.md >/dev/null
 
     local note
     note="$(git notes --ref ephemera show HEAD)"
@@ -272,7 +272,7 @@ test_payload_preserves_file_content() {
     git add test.md
     git commit -m "initial" --quiet
 
-    "$EPHEMERA" save test.md >/dev/null
+    "$EPHEMERA" add test.md >/dev/null
 
     local note
     note="$(git notes --ref ephemera show HEAD)"
@@ -296,7 +296,7 @@ test_requires_git_repo() {
     local tmpdir
     tmpdir="$(mktemp -d)"
     cd "$tmpdir"
-    if "$EPHEMERA" save test.md >/dev/null 2>&1; then
+    if "$EPHEMERA" add test.md >/dev/null 2>&1; then
         rm -rf "$tmpdir"
         return 1  # Should have failed
     fi
@@ -322,7 +322,7 @@ test_restore_single_file() {
     git add test.md
     git commit -m "initial" --quiet
 
-    "$EPHEMERA" save test.md >/dev/null
+    "$EPHEMERA" add test.md >/dev/null
 
     # Remove the file and restore it
     rm test.md
@@ -338,7 +338,7 @@ test_restore_multiple_files() {
     git add PRD.md PLAN.md
     git commit -m "initial" --quiet
 
-    "$EPHEMERA" save PRD.md PLAN.md >/dev/null
+    "$EPHEMERA" add PRD.md PLAN.md >/dev/null
 
     rm PRD.md PLAN.md
     "$EPHEMERA" restore >/dev/null
@@ -353,7 +353,7 @@ test_restore_directory_structure() {
     git add .ai
     git commit -m "initial" --quiet
 
-    "$EPHEMERA" save .ai/ >/dev/null
+    "$EPHEMERA" add .ai/ >/dev/null
 
     rm -rf .ai
     "$EPHEMERA" restore >/dev/null
@@ -366,7 +366,7 @@ test_restore_to_custom_dest() {
     git add test.md
     git commit -m "initial" --quiet
 
-    "$EPHEMERA" save test.md >/dev/null
+    "$EPHEMERA" add test.md >/dev/null
 
     local restore_dir
     restore_dir="$(mktemp -d)"
@@ -382,12 +382,12 @@ test_restore_from_specific_commit() {
     git commit -m "first" --quiet
     local first_sha
     first_sha="$(git rev-parse HEAD)"
-    "$EPHEMERA" save first.md >/dev/null
+    "$EPHEMERA" add first.md >/dev/null
 
     echo "# Second" > second.md
     git add second.md
     git commit -m "second" --quiet
-    "$EPHEMERA" save second.md >/dev/null
+    "$EPHEMERA" add second.md >/dev/null
 
     local restore_dir
     restore_dir="$(mktemp -d)"
@@ -403,7 +403,7 @@ test_restore_fails_on_existing_file() {
     git add test.md
     git commit -m "initial" --quiet
 
-    "$EPHEMERA" save test.md >/dev/null
+    "$EPHEMERA" add test.md >/dev/null
 
     # File already exists, should fail without --force
     if "$EPHEMERA" restore >/dev/null 2>&1; then
@@ -417,7 +417,7 @@ test_restore_force_overwrites() {
     git add test.md
     git commit -m "initial" --quiet
 
-    "$EPHEMERA" save test.md >/dev/null
+    "$EPHEMERA" add test.md >/dev/null
 
     # Modify the file
     echo "# Modified" > test.md
@@ -433,7 +433,7 @@ test_restore_dry_run() {
     git add test.md
     git commit -m "initial" --quiet
 
-    "$EPHEMERA" save test.md >/dev/null
+    "$EPHEMERA" add test.md >/dev/null
     rm test.md
 
     local output
@@ -448,7 +448,7 @@ test_restore_no_note_fails() {
     git add test.md
     git commit -m "initial" --quiet
 
-    # No save was done, restore should fail
+    # No add was done, restore should fail
     if "$EPHEMERA" restore >/dev/null 2>&1; then
         return 1  # Should have failed
     fi
@@ -463,7 +463,7 @@ and tabs:	here"
     git add test.md
     git commit -m "initial" --quiet
 
-    "$EPHEMERA" save test.md >/dev/null
+    "$EPHEMERA" add test.md >/dev/null
     rm test.md
     "$EPHEMERA" restore >/dev/null
 
@@ -481,7 +481,7 @@ test_show_default_outputs_header() {
     git add test.md
     git commit -m "initial" --quiet
 
-    "$EPHEMERA" save test.md >/dev/null
+    "$EPHEMERA" add test.md >/dev/null
 
     local output
     output="$("$EPHEMERA" show 2>&1)"
@@ -497,7 +497,7 @@ test_show_payload_outputs_only_payload() {
     git add test.md
     git commit -m "initial" --quiet
 
-    "$EPHEMERA" save test.md >/dev/null
+    "$EPHEMERA" add test.md >/dev/null
 
     local payload
     payload="$("$EPHEMERA" show --payload)"
@@ -513,7 +513,7 @@ test_list_outputs_filenames() {
     git add .ai/PRD.md
     git commit -m "initial" --quiet
 
-    "$EPHEMERA" save .ai/ >/dev/null
+    "$EPHEMERA" add .ai/ >/dev/null
 
     local output
     output="$("$EPHEMERA" list)"
@@ -539,8 +539,8 @@ test_fetch_notes_from_remote() {
     git commit -m "add PRD" --quiet
     git push origin master --quiet 2>/dev/null
 
-    # Save ephemera and push notes to origin
-    "$EPHEMERA" save PRD.md >/dev/null
+    # Add ephemera and push notes to origin
+    "$EPHEMERA" add PRD.md >/dev/null
     "$EPHEMERA" push >/dev/null 2>&1
 
     # Clone to a new location
@@ -583,7 +583,7 @@ test_notes_available_after_clone_with_fetch_config() {
     git commit -m "add PLAN" --quiet
     git push origin master --quiet 2>/dev/null
 
-    "$EPHEMERA" save PLAN.md >/dev/null
+    "$EPHEMERA" add PLAN.md >/dev/null
     "$EPHEMERA" push >/dev/null 2>&1
 
     # Clone and configure auto-fetch for notes
@@ -626,13 +626,13 @@ test_multiple_commits_notes_sync() {
     git commit -m "first" --quiet
     local first_sha
     first_sha="$(git rev-parse HEAD)"
-    "$EPHEMERA" save PRD.md >/dev/null
+    "$EPHEMERA" add PRD.md >/dev/null
 
     # Second commit with different ephemera
     echo "# Second PRD" > PRD.md
     git add PRD.md
     git commit -m "second" --quiet
-    "$EPHEMERA" save PRD.md >/dev/null
+    "$EPHEMERA" add PRD.md >/dev/null
 
     # Push everything
     git push origin master --quiet 2>/dev/null
@@ -679,7 +679,7 @@ test_record_rewrite_updates_commit_history() {
     local old_sha
     old_sha="$(git rev-parse HEAD)"
 
-    "$EPHEMERA" save test.md >/dev/null
+    "$EPHEMERA" add test.md >/dev/null
 
     # Simulate a rewrite (amend)
     echo "# Updated" >> test.md
@@ -713,7 +713,7 @@ test_record_rewrite_idempotent() {
     local old_sha
     old_sha="$(git rev-parse HEAD)"
 
-    "$EPHEMERA" save test.md >/dev/null
+    "$EPHEMERA" add test.md >/dev/null
 
     # Simulate a rewrite
     git commit --amend --no-edit --quiet
@@ -751,7 +751,7 @@ test_record_rewrite_handles_old_notes_without_history() {
     original_sha="$(git rev-parse HEAD)"
 
     # Save a note
-    "$EPHEMERA" save test.md >/dev/null
+    "$EPHEMERA" add test.md >/dev/null
 
     # Get the note content and remove commitHistory to simulate old format
     local note_content
@@ -796,7 +796,7 @@ test_record_rewrite_multiple_commits() {
     git commit -m "first" --quiet
     local first_old
     first_old="$(git rev-parse HEAD)"
-    "$EPHEMERA" save first.md >/dev/null
+    "$EPHEMERA" add first.md >/dev/null
 
     # Create second commit with ephemera
     echo "# Second" > second.md
@@ -804,7 +804,7 @@ test_record_rewrite_multiple_commits() {
     git commit -m "second" --quiet
     local second_old
     second_old="$(git rev-parse HEAD)"
-    "$EPHEMERA" save second.md >/dev/null
+    "$EPHEMERA" add second.md >/dev/null
 
     # Amend both - first amend second commit, then simulate first being rewritten
     git commit --amend --no-edit --quiet
@@ -894,12 +894,12 @@ test_install_hooks_force_overwrites() {
     ! grep -q "# Custom hook" "$hook_file"
 }
 
-test_new_save_has_commit_history_field() {
+test_new_add_has_commit_history_field() {
     echo "# Test" > test.md
     git add test.md
     git commit -m "initial" --quiet
 
-    "$EPHEMERA" save test.md >/dev/null
+    "$EPHEMERA" add test.md >/dev/null
 
     local note
     note="$("$EPHEMERA" show 2>&1)"
@@ -921,16 +921,16 @@ main() {
         exit 1
     fi
 
-    run_test test_save_single_file
-    run_test test_save_multiple_files
-    run_test test_save_directory
-    run_test test_save_glob_pattern
-    run_test test_save_with_message
-    run_test test_save_to_specific_commit
-    run_test test_save_strict_mode_fails_on_missing
-    run_test test_save_nonstrict_ignores_missing
-    run_test test_save_no_paths_fails
-    run_test test_save_overwrites_existing_note
+    run_test test_add_single_file
+    run_test test_add_multiple_files
+    run_test test_add_directory
+    run_test test_add_glob_pattern
+    run_test test_add_with_message
+    run_test test_add_to_specific_commit
+    run_test test_add_strict_mode_fails_on_missing
+    run_test test_add_nonstrict_ignores_missing
+    run_test test_add_no_paths_fails
+    run_test test_add_overwrites_existing_note
     run_test test_note_format_has_required_fields
     run_test test_payload_is_valid_base64_targz
     run_test test_payload_preserves_file_content
@@ -970,7 +970,7 @@ main() {
     run_test test_install_hooks_fails_on_second_run
     run_test test_install_hooks_fails_with_existing_hook
     run_test test_install_hooks_force_overwrites
-    run_test test_new_save_has_commit_history_field
+    run_test test_new_add_has_commit_history_field
 
     echo ""
     echo "========================================="

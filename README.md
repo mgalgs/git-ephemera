@@ -56,11 +56,11 @@ Typical day-to-day flow:
 ```bash
 git commit -m "..."
 
-# Attach ephemeral files to the commit as a note
-git ephemera save .ai/
+# Attach ephemeral files to the commit as a note (updates notes immediately)
+git ephemera add .ai/
 
 # Attach ephemera to a commit other than HEAD
-git ephemera save .ai/ --commit <rev>
+git ephemera add .ai/ --commit <rev>
 
 # Share notes with collaborators/other machines
 git ephemera push
@@ -86,24 +86,24 @@ git ephemera restore --commit <rev>
 Usage: git ephemera <command> [options]
 
 Commands:
-  save <path>...         Archive files and store as a git note
+  add <path>...          Add ephemeral files to a commit
   restore                Extract files from a commit's note
   show                   Display note header/metadata
   list                   List archived filenames without extracting
   push [<remote>]        Push ephemera notes ref (default: origin)
   fetch [<remote>]       Fetch ephemera notes ref (default: origin)
   setup-remote [<remote>]  Configure remote fetch refspec for notes (default: origin)
-  install-hooks          Install post-rewrite hook for commit rewrite tracking
+  install-hooks          Install post-rewrite hook for commit tracking
   record-rewrite         Record commit rewrite history (used by post-rewrite hook)
 
-Options for 'save':
+Options for 'add':
   --commit <rev>     Target commit (default: HEAD)
   --message <text>   Optional message stored in header
   --strict           Fail if any path doesn't exist
 
 Options for 'restore':
   --commit <rev>     Source commit (default: HEAD)
-  --dest <dir>       Extraction directory (default: .)
+  --dest <dir>       Extraction directory (default: `.`)
   --force            Overwrite existing files
   --dry-run          List files without extracting
 
@@ -131,8 +131,8 @@ Options for 'record-rewrite':
   --ref <notes>     Notes ref to update (default: ephemera)
 
 Examples:
-  git ephemera save .ai/
-  git ephemera save PRD.md PLAN.md
+  git ephemera add .ai/
+  git ephemera add PRD.md PLAN.md
   git ephemera restore --commit abc123
   git ephemera list
   git ephemera push
@@ -141,13 +141,25 @@ Examples:
   git ephemera install-hooks
 ```
 
-### Save files to current commit
+### Add files to a commit
 
 ```bash
-git ephemera save .ai/
-git ephemera save PRD.md PLAN.md
-git ephemera save 'specs/*.md'
+# Add files (updates notes for HEAD immediately)
+git ephemera add .ai/
+git ephemera add PRD.md PLAN.md
+git ephemera add 'specs/*.md'
+
+# Add more files later
+git ephemera add .ai/*.md
+
+# Update an existing file
+git ephemera add .ai/PROMPT.md
+
+# Add ephemera to another commit
+git ephemera add /tmp/old_file.txt --commit HEAD~5
 ```
+
+Unlike `git add`, `git ephemera add` adds/updates the file(s) in the notes immediately (there's no staging index). If the commit already has ephemera, the new files are merged with the existing ones; existing files are overwritten with the new content.
 
 ### Restore files from a commit
 
@@ -189,12 +201,20 @@ claude < .ai/PROMPT.md  # or in a loop for full ralph wiggum goodness
 git add ...affected source files...  # _not_ the ephemeral files! i.e. nothing under .ai/
 git commit -m "..."
 # Now stash the .ai/ files on the newly created commit for tracking
-git ephemera save .ai/
+git ephemera add .ai/
 ```
 
 If you need to continue iterating, goto Step 2.
 
 (In a fully automated setup these commands are part of the prompt/plan).
+
+#### Step 4: Add more ephemeral files later
+
+```
+# You can add more files at any time
+git ephemera add .ai/analysis.md
+git ephemera add .ai/updates/
+```
 
 #### Push work and notes and clean up the ephemeral files
 
@@ -206,15 +226,32 @@ rm -rf .ai/*  # clean up notes in worktree to make room for the next task
 
 ## Commands
 
-### `save <path>...`
+### `add <path>... [--commit REV]`
 
-Archive files and store as a git note.
+Add ephemeral files to a commit.
 
 | Option             | Description                       |
 |--------------------|-----------------------------------|
 | `--commit <rev>`   | Target commit (default: `HEAD`)   |
 | `--message <text>` | Optional message stored in header |
 | `--strict`         | Fail if any path doesn't exist    |
+
+Unlike `git add`, `git ephemera add` adds/updates the file(s) in the notes immediately (there's no staging index).
+
+```bash
+# Add files (updates notes for HEAD immediately)
+git ephemera add .ai/PROMPT.md
+git ephemera add .ai/specs/
+
+# Add more files later
+git ephemera add .ai/*.md
+
+# Update an existing file
+git ephemera add .ai/PROMPT.md
+
+# Add ephemera to another commit
+git ephemera add /tmp/old_file.txt --commit HEAD~5
+```
 
 ### `restore`
 

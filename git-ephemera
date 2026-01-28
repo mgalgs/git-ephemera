@@ -17,7 +17,7 @@ usage() {
 Usage: git ephemera <command> [options]
 
 Commands:
-  save <path>...         Archive files and store as a git note
+  add <path>...          Add ephemeral files to a commit
   restore                Extract files from a commit's note
   show                   Display note header/metadata
   list                   List archived filenames without extracting
@@ -27,7 +27,7 @@ Commands:
   install-hooks          Install/update post-rewrite hook for commit tracking
   record-rewrite         Record commit rewrite history (used by post-rewrite hook)
 
-Options for 'save':
+Options for 'add':
   --commit <rev>     Target commit (default: HEAD)
   --message <text>   Optional message stored in header
   --strict           Fail if any path doesn't exist
@@ -59,8 +59,8 @@ Options for 'install-hooks':
   --force           Overwrite existing post-rewrite hook
 
 Examples:
-  git ephemera save .ai/
-  git ephemera save PRD.md PLAN.md
+  git ephemera add .ai/
+  git ephemera add PRD.md PLAN.md
   git ephemera restore --commit abc123
   git ephemera list
   git ephemera push
@@ -214,70 +214,14 @@ collect_paths() {
     done
 
     if [[ ${#found[@]} -eq 0 ]]; then
-        die "no files to save"
+        die "no files to add"
     fi
 
     printf '%s\n' "${found[@]}"
 }
 
 
-create_note() {
-    local commit
-    local ref
-    local message
-
-    commit="$1"
-    ref="$2"
-    message="$3"
-    shift 3
-
-    local -a files
-    files=("$@")
-
-    local repo_root
-    repo_root="$(git rev-parse --show-toplevel)"
-
-    local full_sha
-    if ! full_sha="$(resolve_commit "$commit")"; then
-        die "invalid commit: $commit"
-    fi
-
-    local header
-    header="ephemeraVersion: 1
-encoding: tar+gzip+base64
-createdAt: $(date -u +%Y-%m-%dT%H:%M:%SZ)
-commit: $full_sha
-commitHistory: []"
-
-    if [[ -n "$message" ]]; then
-        header="$header
-message: $message"
-    fi
-
-    header="$header
-paths:"
-
-    local f
-    for f in "${files[@]}"; do
-        header="$header
-  - $f"
-    done
-
-    local payload
-    payload="$(cd "$repo_root" && tar -czf - "${files[@]}" | base64 | tr -d '\n')"
-
-    local note_body
-    note_body="$header
----
-$payload"
-
-    printf '%s\n' "$note_body" | git notes --ref "$ref" add -f -F - "$full_sha"
-
-    echo "Saved ${#files[@]} file(s) to notes ref '$ref' on commit ${full_sha:0:12}"
-}
-
-
-cmd_save() {
+cmd_add() {
     local commit="HEAD"
     local ref="ephemera"
     local message=""
@@ -323,10 +267,120 @@ cmd_save() {
         die "no paths specified"
     fi
 
-    local -a files
-    mapfile -t files < <(collect_paths "$strict" "${paths[@]}")
+    local -a new_files
+    mapfile -t new_files < <(collect_paths "$strict" "${paths[@]}")
 
-    create_note "$commit" "$ref" "$message" "${files[@]}"
+    local full_sha
+    if ! full_sha="$(resolve_commit "$commit")"; then
+        die "invalid commit: $commit"
+    fi
+
+    local repo_root
+    repo_root="$(git rev-parse --show-toplevel)"
+
+    # Check if note already exists
+    local existing_note
+    if existing_note="$(git notes --ref "$ref" show "$full_sha" 2>/dev/null)"; then
+        # Parse existing note
+        local existing_payload=""
+        local in_payload=0
+        while IFS= read -r line; do
+            if [[ $in_payload -eq 0 && "$line" == "---" ]]; then
+                in_payload=1
+                continue
+            fi
+            if [[ $in_payload -eq 1 ]]; then
+                existing_payload="$existing_payload$line"
+            fi
+        done <<< "$existing_note"
+
+        # Create a temporary directory to merge
+        local tmpdir
+        tmpdir="$(mktemp -d)"
+        trap 'rm -rf "$tmpdir"' EXIT
+
+        # Extract existing files to temp dir
+        if [[ -n "$existing_payload" ]]; then
+            echo "$existing_payload" | tr -d '[:space:]' | base64 -d | tar -xzf - -C "$tmpdir" 2>/dev/null || true
+        fi
+
+        # Copy new files to temp dir
+        local f
+        for f in "${new_files[@]}"; do
+            mkdir -p "$tmpdir/$(dirname "$f")"
+            cp "$repo_root/$f" "$tmpdir/$f"
+        done
+
+        # Build merged file list
+        local -a merged_files=()
+        while IFS= read -r -d '' file; do
+            local rel="${file#"$tmpdir"/}"
+            merged_files+=("$rel")
+        done < <(find "$tmpdir" -type f -print0 | sort -z)
+
+        # Create new note with merged files
+        local merged_payload
+        merged_payload="$(cd "$tmpdir" && tar -czf - "${merged_files[@]}" | base64 | tr -d '\n')"
+
+        # Build header
+        local header
+        header="ephemeraVersion: 1
+encoding: tar+gzip+base64
+updatedAt: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+commit: $full_sha
+commitHistory: []"
+
+        if [[ -n "$message" ]]; then
+            header="$header
+message: $message"
+        fi
+
+        header="$header
+paths:"
+        for f in "${merged_files[@]}"; do
+            header="$header
+  - $f"
+        done
+
+        local note_body
+        note_body="$header
+---
+$merged_payload"
+
+        printf '%s\n' "$note_body" | git notes --ref "$ref" add -f -F - "$full_sha"
+        echo "Added ${#new_files[@]} file(s) to notes ref '$ref' on commit ${full_sha:0:12}"
+    else
+        # No existing note, create new one
+        local header
+        header="ephemeraVersion: 1
+encoding: tar+gzip+base64
+createdAt: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+commit: $full_sha
+commitHistory: []"
+
+        if [[ -n "$message" ]]; then
+            header="$header
+message: $message"
+        fi
+
+        header="$header
+paths:"
+        for f in "${new_files[@]}"; do
+            header="$header
+  - $f"
+        done
+
+        local payload
+        payload="$(cd "$repo_root" && tar -czf - "${new_files[@]}" | base64 | tr -d '\n')"
+
+        local note_body
+        note_body="$header
+---
+$payload"
+
+        printf '%s\n' "$note_body" | git notes --ref "$ref" add -f -F - "$full_sha"
+        echo "Added ${#new_files[@]} file(s) to notes ref '$ref' on commit ${full_sha:0:12}"
+    fi
 }
 
 
@@ -699,8 +753,8 @@ main() {
         -h|--help|help)
             usage
             ;;
-        save)
-            cmd_save "$@"
+        add)
+            cmd_add "$@"
             ;;
         restore)
             cmd_restore "$@"
