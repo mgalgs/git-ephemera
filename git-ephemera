@@ -312,6 +312,23 @@ cmd_add() {
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
+            -h|--help)
+                cat <<'EOF'
+Usage: git ephemera add [options] <path>...
+
+Options:
+  --commit <rev>     Target commit (default: HEAD)
+  --message <text>   Optional message stored in header
+  --strict           Fail if any path doesn't exist
+  -h, --help         Show this help
+
+Examples:
+  git ephemera add .ai/
+  git ephemera add PRD.md PLAN.md
+  git ephemera add --commit abc123 --message "WIP files" ./tmp/
+EOF
+                exit 0
+                ;;
             --commit)
                 if [[ $# -lt 2 ]]; then
                     die "--commit requires an argument"
@@ -447,6 +464,24 @@ cmd_restore() {
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
+            -h|--help)
+                cat <<'EOF'
+Usage: git ephemera restore [options]
+
+Options:
+  --commit <rev>     Source commit (default: HEAD)
+  --dest <dir>       Extraction directory (default: .)
+  --force            Overwrite existing files
+  --dry-run          List files without extracting
+  -h, --help         Show this help
+
+Examples:
+  git ephemera restore
+  git ephemera restore --commit abc123 --dest ./extracted/
+  git ephemera restore --dry-run
+EOF
+                exit 0
+                ;;
             --commit)
                 if [[ $# -lt 2 ]]; then
                     die "--commit requires an argument"
@@ -501,6 +536,23 @@ cmd_show() {
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
+            -h|--help)
+                cat <<'EOF'
+Usage: git ephemera show [options]
+
+Options:
+  --commit <rev>     Source commit (default: HEAD)
+  --header           Print only the header
+  --payload          Print only the base64 payload
+  -h, --help         Show this help
+
+Examples:
+  git ephemera show
+  git ephemera show --commit abc123 --header
+  git ephemera show --payload
+EOF
+                exit 0
+                ;;
             --commit)
                 if [[ $# -lt 2 ]]; then
                     die "--commit requires an argument"
@@ -557,6 +609,20 @@ cmd_list() {
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
+            -h|--help)
+                cat <<'EOF'
+Usage: git ephemera list [options]
+
+Options:
+  --commit <rev>     Source commit (default: HEAD)
+  -h, --help         Show this help
+
+Examples:
+  git ephemera list
+  git ephemera list --commit abc123
+EOF
+                exit 0
+                ;;
             --commit)
                 if [[ $# -lt 2 ]]; then
                     die "--commit requires an argument"
