@@ -250,12 +250,17 @@ collect_paths() {
 
     local pattern
     for pattern in "${patterns[@]}"; do
+        # Skip empty patterns to avoid matching entire repo
+        [[ -z "$pattern" ]] && continue
+
         local -a matches=()
 
-        shopt -s nullglob globstar
-        # shellcheck disable=SC2206  # Intentional glob expansion
-        matches=("$repo_root"/$pattern)
-        shopt -u nullglob globstar
+        # Use compgen -G for safe glob expansion that handles spaces in filenames
+        # compgen returns one result per line, avoiding word splitting issues
+        local glob_pattern="$repo_root/$pattern"
+        while IFS= read -r match; do
+            matches+=("$match")
+        done < <(compgen -G "$glob_pattern" 2>/dev/null || true)
 
         # Filter to only existing paths
         local -a existing=()
