@@ -76,6 +76,83 @@ in_git_repo() {
 }
 
 
+# Escape a string for safe inclusion in YAML
+# Outputs raw string if safe, otherwise single-quoted with escaped quotes
+yaml_escape() {
+    local str="$1"
+    # Safe characters: alphanumeric, underscore, dot, slash, hyphen
+    if [[ "$str" =~ ^[a-zA-Z0-9_./-]+$ ]]; then
+        printf '%s' "$str"
+    else
+        # Use single quotes, escape single quotes by doubling them
+        # YAML single-quoted string escaping: ' -> ''
+        printf "'%s'" "${str//\x27/\x27\x27}"
+    fi
+}
+
+
+# Build a note header with proper YAML formatting
+# Arguments:
+#   timestamp_field commit commit_history_line message_line created_at_value files...
+#
+# - timestamp_field: "createdAt" or "updatedAt"
+# - commit_history_line: full line like "commitHistory: []" (already formatted)
+# - message_line: full line like "message: '...'", or empty
+# - created_at_value: ISO timestamp (value only) to preserve, or empty
+build_note_header() {
+    local timestamp_field="$1"
+    local commit="$2"
+    local commit_history_line="$3"
+    local message_line="$4"
+    local created_at_value="$5"
+    shift 5
+    local -a files=("$@")
+
+    local now
+    now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+    local header
+    header="ephemeraVersion: 1
+encoding: tar+gzip+base64"
+
+    if [[ -n "$created_at_value" ]]; then
+        header="$header
+createdAt: $created_at_value"
+    elif [[ "$timestamp_field" == "createdAt" ]]; then
+        header="$header
+createdAt: $now"
+    fi
+
+    if [[ "$timestamp_field" == "updatedAt" ]]; then
+        header="$header
+updatedAt: $now"
+    fi
+
+    if [[ -z "$commit_history_line" ]]; then
+        commit_history_line="commitHistory: []"
+    fi
+
+    header="$header
+commit: $commit
+$commit_history_line"
+
+    if [[ -n "$message_line" ]]; then
+        header="$header
+$message_line"
+    fi
+
+    header="$header
+paths:"
+    local f
+    for f in "${files[@]}"; do
+        header="$header
+  - $(yaml_escape "$f")"
+    done
+
+    printf '%s' "$header"
+}
+
+
 resolve_commit() {
     local rev
     rev="${1:-HEAD}"
@@ -278,30 +355,35 @@ cmd_add() {
     local repo_root
     repo_root="$(git rev-parse --show-toplevel)"
 
+    local message_line=""
+    if [[ -n "$message" ]]; then
+        message_line="message: $(yaml_escape "$message")"
+    fi
+
     # Check if note already exists
     local existing_note
     if existing_note="$(git notes --ref "$ref" show "$full_sha" 2>/dev/null)"; then
-        # Parse existing note
-        local existing_payload=""
-        local in_payload=0
-        while IFS= read -r line; do
-            if [[ $in_payload -eq 0 && "$line" == "---" ]]; then
-                in_payload=1
-                continue
-            fi
-            if [[ $in_payload -eq 1 ]]; then
-                existing_payload="$existing_payload$line"
-            fi
-        done <<< "$existing_note"
+        parse_note "$existing_note"
+
+        # Preserve createdAt (if present) and commitHistory from the existing header.
+        local existing_created_at=""
+        existing_created_at="$(echo "$NOTE_HEADER" | sed -n 's/^createdAt: //p' | head -n 1)"
+
+        local commit_history_line=""
+        commit_history_line="$(echo "$NOTE_HEADER" | sed -n 's/^commitHistory: .*/&/p' | head -n 1)"
+        if [[ -z "$commit_history_line" ]]; then
+            commit_history_line="commitHistory: []"
+        fi
 
         # Create a temporary directory to merge
         local tmpdir
-        tmpdir="$(mktemp -d)"
-        trap 'rm -rf "$tmpdir"' EXIT
+        tmpdir="$(mktemp -d)" || die "failed to create temp directory"
+        # shellcheck disable=SC2064  # Expand tmpdir at definition time
+        trap "rm -rf '$tmpdir'" EXIT
 
         # Extract existing files to temp dir
-        if [[ -n "$existing_payload" ]]; then
-            echo "$existing_payload" | tr -d '[:space:]' | base64 -d | tar -xzf - -C "$tmpdir" 2>/dev/null || true
+        if [[ -n "$NOTE_PAYLOAD" ]]; then
+            echo "$NOTE_PAYLOAD" | tr -d '[:space:]' | base64 -d | tar -xzf - -C "$tmpdir" 2>/dev/null || true
         fi
 
         # Copy new files to temp dir
@@ -322,25 +404,8 @@ cmd_add() {
         local merged_payload
         merged_payload="$(cd "$tmpdir" && tar -czf - "${merged_files[@]}" | base64 | tr -d '\n')"
 
-        # Build header
         local header
-        header="ephemeraVersion: 1
-encoding: tar+gzip+base64
-updatedAt: $(date -u +%Y-%m-%dT%H:%M:%SZ)
-commit: $full_sha
-commitHistory: []"
-
-        if [[ -n "$message" ]]; then
-            header="$header
-message: $message"
-        fi
-
-        header="$header
-paths:"
-        for f in "${merged_files[@]}"; do
-            header="$header
-  - $f"
-        done
+        header="$(build_note_header "updatedAt" "$full_sha" "$commit_history_line" "$message_line" "$existing_created_at" "${merged_files[@]}")"
 
         local note_body
         note_body="$header
@@ -352,23 +417,7 @@ $merged_payload"
     else
         # No existing note, create new one
         local header
-        header="ephemeraVersion: 1
-encoding: tar+gzip+base64
-createdAt: $(date -u +%Y-%m-%dT%H:%M:%SZ)
-commit: $full_sha
-commitHistory: []"
-
-        if [[ -n "$message" ]]; then
-            header="$header
-message: $message"
-        fi
-
-        header="$header
-paths:"
-        for f in "${new_files[@]}"; do
-            header="$header
-  - $f"
-        done
+        header="$(build_note_header "createdAt" "$full_sha" "commitHistory: []" "$message_line" "" "${new_files[@]}")"
 
         local payload
         payload="$(cd "$repo_root" && tar -czf - "${new_files[@]}" | base64 | tr -d '\n')"
@@ -643,21 +692,35 @@ commitHistory: []')"
 $NOTE_PAYLOAD"
 
     # Write the updated note back
-    printf '%s\n' "$new_note_body" | git notes --ref "$ref" add -f -F - "$new_sha" 2>/dev/null
+    if ! printf '%s\n' "$new_note_body" | git notes --ref "$ref" add -f -F - "$new_sha"; then
+        die "failed to update note for commit ${new_sha:0:12}"
+    fi
 
     return 0
 }
 
 
 cmd_record_rewrite() {
-    local ref="${1:-ephemera}"
+    local ref="ephemera"
 
-    # Accept optional --ref argument
-    if [[ "$ref" == "--ref" && $# -ge 2 ]]; then
-        ref="$2"
-    elif [[ $# -gt 1 ]]; then
-        die "unexpected argument: ${2}"
-    fi
+    # Parse optional --ref argument
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --ref)
+                if [[ $# -lt 2 ]]; then
+                    die "--ref requires an argument"
+                fi
+                ref="$2"
+                shift 2
+                ;;
+            -*)
+                die "unknown option: $1"
+                ;;
+            *)
+                die "unexpected argument: $1"
+                ;;
+        esac
+    done
 
     local count=0
 
@@ -693,7 +756,9 @@ HOOK_TEMPLATE='#!/bin/bash
 # git-ephemera hook to track commit rewrites
 # (generated by: git ephemera install-hooks)
 if command -v git >/dev/null 2>&1; then
-  git ephemera record-rewrite <&0 || true
+  git ephemera record-rewrite || {
+    echo "warning: git ephemera record-rewrite failed" >&2
+  }
 fi'
 
 

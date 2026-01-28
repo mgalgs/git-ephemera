@@ -151,7 +151,8 @@ test_add_with_message() {
     local note
     note="$(git notes --ref ephemera show HEAD)"
 
-    echo "$note" | grep -q "message: Test add message"
+    # Message with spaces is properly YAML-escaped with single quotes
+    echo "$note" | grep -q "message: 'Test add message'"
 }
 
 test_add_to_specific_commit() {
@@ -907,6 +908,61 @@ test_new_add_has_commit_history_field() {
     echo "$note" | grep -q "^commitHistory: \[\]$"
 }
 
+test_add_merge_preserves_created_at_and_commit_history() {
+    # Create initial commit with ephemera
+    echo "# Initial" > test.md
+    git add test.md
+    git commit -m "initial" --quiet
+    local old_sha
+    old_sha="$(git rev-parse HEAD)"
+
+    "$EPHEMERA" add test.md >/dev/null
+
+    # Simulate a rewrite to introduce commitHistory on the note
+    echo "# Updated" >> test.md
+    git add test.md
+    git commit --amend --no-edit --quiet
+    local new_sha
+    new_sha="$(git rev-parse HEAD)"
+
+    # Manually move note (simulating git notes rewrite behavior)
+    local note_content
+    note_content="$(git notes --ref ephemera show "$old_sha")"
+    printf '%s\n' "$note_content" | git notes --ref ephemera add -f -F - "$new_sha"
+    git notes --ref ephemera remove "$old_sha" 2>/dev/null || true
+
+    # Record rewrite history so commitHistory is present
+    echo "$old_sha $new_sha" | "$EPHEMERA" record-rewrite >/dev/null
+
+    # Capture createdAt and commitHistory before a merge-add
+    local before
+    before="$("$EPHEMERA" show --commit "$new_sha")"
+
+    local created_at_before
+    created_at_before="$(echo "$before" | sed -n 's/^createdAt: //p' | head -n 1)"
+    [[ -n "$created_at_before" ]]
+
+    echo "$before" | grep -q "^commitHistory: \[" && echo "$before" | grep -qF "$old_sha"
+
+    # Merge-add: add another file to existing note
+    echo "# Another" > another.md
+    "$EPHEMERA" add another.md --commit "$new_sha" >/dev/null
+
+    local after
+    after="$("$EPHEMERA" show --commit "$new_sha")"
+
+    # createdAt should be preserved
+    local created_at_after
+    created_at_after="$(echo "$after" | sed -n 's/^createdAt: //p' | head -n 1)"
+    [[ "$created_at_after" == "$created_at_before" ]]
+
+    # commitHistory should still contain the old sha
+    echo "$after" | grep -q "^commitHistory: \[" && echo "$after" | grep -qF "$old_sha"
+
+    # updatedAt should exist after merge
+    echo "$after" | grep -q "^updatedAt: "
+}
+
 # =============================================================================
 # Main
 # =============================================================================
@@ -971,6 +1027,7 @@ main() {
     run_test test_install_hooks_fails_with_existing_hook
     run_test test_install_hooks_force_overwrites
     run_test test_new_add_has_commit_history_field
+    run_test test_add_merge_preserves_created_at_and_commit_history
 
     echo ""
     echo "========================================="
