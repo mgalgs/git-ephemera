@@ -377,6 +377,16 @@ EOF
     local repo_root
     repo_root="$(git rev-parse --show-toplevel)"
 
+    # Validate all paths don't escape repository root
+    local f
+    for f in "${new_files[@]}"; do
+        local abs_path
+        abs_path="$(realpath -m "$repo_root/$f")"
+        if [[ ! "$abs_path" =~ ^"$repo_root"(/|$) ]]; then
+            die "path escapes repository: $f"
+        fi
+    done
+
     local message_line=""
     if [[ -n "$message" ]]; then
         message_line="message: $(yaml_escape "$message")"
@@ -411,6 +421,12 @@ EOF
         # Copy new files to temp dir
         local f
         for f in "${new_files[@]}"; do
+            # Validate path doesn't escape repo (prevent ../../../etc/passwd attacks)
+            local abs_path
+            abs_path="$(realpath -m "$repo_root/$f")"
+            if [[ ! "$abs_path" =~ ^"$repo_root"(/|$) ]]; then
+                die "path escapes repository: $f"
+            fi
             mkdir -p "$tmpdir/$(dirname "$f")"
             cp "$repo_root/$f" "$tmpdir/$f"
         done
