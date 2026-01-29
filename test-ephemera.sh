@@ -340,6 +340,11 @@ test_help_shows_usage() {
     "$EPHEMERA" --help 2>&1 | grep -qi "usage"
 }
 
+test_version_shows_version() {
+    # --version works even outside a git repo
+    "$EPHEMERA" --version | grep -q "git-ephemera [0-9]\+\.[0-9]\+\.[0-9]\+"
+}
+
 # =============================================================================
 # Restore command tests
 # =============================================================================
@@ -998,6 +1003,7 @@ main() {
     run_test test_payload_preserves_file_content
     run_test test_requires_git_repo
     run_test test_help_shows_usage
+    run_test test_version_shows_version
 
     # Restore tests
     run_test test_restore_single_file
