@@ -31,12 +31,14 @@ else
     NC=''
 fi
 
-# Test temp directory
+# Test temp directory (sandbox root)
 TEST_DIR=""
 
 setup() {
+    # Create sandbox root with subdirectories for isolation
     TEST_DIR="$(mktemp -d)"
-    cd "$TEST_DIR"
+    mkdir -p "$TEST_DIR/repo" "$TEST_DIR/tmp"
+    cd "$TEST_DIR/repo"
     git init --quiet
     git config user.email "test@test.com"
     git config user.name "Test User"
@@ -231,6 +233,30 @@ test_add_overwrites_existing_note() {
     [[ "$first_note" != "$second_note" ]]
 }
 
+test_add_rejects_path_traversal() {
+    # Path traversal test - verifies that patterns matching files outside
+    # the repo are rejected. The pattern '../file.txt' would match files
+    # in the parent directory which should not be archived.
+
+    echo "# Safe file" > safe.md
+    git add safe.md
+    git commit -m "initial" --quiet
+
+    # Create a file outside the repo but inside sandbox (in TEST_DIR/tmp)
+    local outside_file
+    outside_file="$TEST_DIR/tmp/outside_$$.txt"
+    echo "outside data" > "$outside_file"
+
+    # Try to add it using a traversal pattern - this should fail
+    # The file exists but is outside the repo root
+    local result=0
+    if "$EPHEMERA" add "../tmp/outside_$$.txt" >/dev/null 2>&1; then
+        result=1  # Should have failed
+    fi
+
+    return $result
+}
+
 test_note_format_has_required_fields() {
     echo "# Test" > test.md
     git add test.md
@@ -281,27 +307,27 @@ test_payload_preserves_file_content() {
     local payload
     payload="$(echo "$note" | sed -n '/^---$/,$ p' | tail -n +2 | tr -d '\n')"
 
-    # Extract to temp location and verify content
+    # Extract to sandbox temp dir and verify content
     local extract_dir
-    extract_dir="$(mktemp -d)"
+    extract_dir="$TEST_DIR/tmp/extract_$$"
+    mkdir -p "$extract_dir"
     echo "$payload" | base64 -d | tar -xzf - -C "$extract_dir"
 
     local extracted
     extracted="$(cat "$extract_dir/test.md")"
-    rm -rf "$extract_dir"
 
     [[ "$extracted" == "$content" ]]
 }
 
 test_requires_git_repo() {
+    # Use sandbox temp dir (outside repo but inside sandbox)
     local tmpdir
-    tmpdir="$(mktemp -d)"
+    tmpdir="$TEST_DIR/tmp/norepo_$$"
+    mkdir -p "$tmpdir"
     cd "$tmpdir"
     if "$EPHEMERA" add test.md >/dev/null 2>&1; then
-        rm -rf "$tmpdir"
         return 1  # Should have failed
     fi
-    rm -rf "$tmpdir"
     return 0
 }
 
@@ -370,11 +396,11 @@ test_restore_to_custom_dest() {
     "$EPHEMERA" add test.md >/dev/null
 
     local restore_dir
-    restore_dir="$(mktemp -d)"
+    restore_dir="$TEST_DIR/tmp/restore_$$"
+    mkdir -p "$restore_dir"
     "$EPHEMERA" restore --dest "$restore_dir" >/dev/null
 
     [[ -f "$restore_dir/test.md" ]]
-    rm -rf "$restore_dir"
 }
 
 test_restore_from_specific_commit() {
@@ -391,12 +417,12 @@ test_restore_from_specific_commit() {
     "$EPHEMERA" add second.md >/dev/null
 
     local restore_dir
-    restore_dir="$(mktemp -d)"
+    restore_dir="$TEST_DIR/tmp/restore_commit_$$"
+    mkdir -p "$restore_dir"
     "$EPHEMERA" restore --commit "$first_sha" --dest "$restore_dir" >/dev/null
 
     # Should have first.md, not second.md
     [[ -f "$restore_dir/first.md" ]] && [[ ! -f "$restore_dir/second.md" ]]
-    rm -rf "$restore_dir"
 }
 
 test_restore_fails_on_existing_file() {
@@ -527,9 +553,12 @@ test_list_outputs_filenames() {
 # =============================================================================
 
 test_fetch_notes_from_remote() {
-    # Create origin repo with a ephemera
-    local origin_dir
-    origin_dir="$(mktemp -d)"
+    # Create origin repo under sandbox tmp
+    local origin_dir clone_dir
+    origin_dir="$TEST_DIR/tmp/origin_$$"
+    clone_dir="$TEST_DIR/tmp/clone_$$"
+    mkdir -p "$origin_dir" "$clone_dir"
+
     git clone --bare . "$origin_dir" --quiet 2>/dev/null
 
     # Add remote and push initial content
@@ -544,15 +573,12 @@ test_fetch_notes_from_remote() {
     "$EPHEMERA" add PRD.md >/dev/null
     "$EPHEMERA" push >/dev/null 2>&1
 
-    # Clone to a new location
-    local clone_dir
-    clone_dir="$(mktemp -d)"
+    # Clone to a new location (under sandbox)
     git clone "$origin_dir" "$clone_dir" --quiet 2>/dev/null
     cd "$clone_dir"
 
     # Notes should NOT be there yet (git clone doesn't fetch notes by default)
     if "$EPHEMERA" restore --dry-run >/dev/null 2>&1; then
-        rm -rf "$origin_dir" "$clone_dir"
         return 1  # Notes shouldn't be available yet
     fi
 
@@ -562,19 +588,17 @@ test_fetch_notes_from_remote() {
     # Now restore should work
     "$EPHEMERA" restore >/dev/null
 
-    local result=0
-    if [[ ! -f PRD.md ]] || ! grep -q "PRD content" PRD.md; then
-        result=1
-    fi
-
-    rm -rf "$origin_dir" "$clone_dir"
-    return $result
+    [[ -f PRD.md ]] && grep -q "PRD content" PRD.md
 }
 
 test_notes_available_after_clone_with_fetch_config() {
-    # Create origin repo
-    local origin_dir
-    origin_dir="$(mktemp -d)"
+    # Create origin repo under sandbox tmp
+    local origin_dir clone_dir restore_dir
+    origin_dir="$TEST_DIR/tmp/origin2_$$"
+    clone_dir="$TEST_DIR/tmp/clone2_$$"
+    restore_dir="$TEST_DIR/tmp/restore2_$$"
+    mkdir -p "$origin_dir" "$clone_dir" "$restore_dir"
+
     git clone --bare . "$origin_dir" --quiet 2>/dev/null
 
     git remote add origin "$origin_dir"
@@ -587,9 +611,7 @@ test_notes_available_after_clone_with_fetch_config() {
     "$EPHEMERA" add PLAN.md >/dev/null
     "$EPHEMERA" push >/dev/null 2>&1
 
-    # Clone and configure auto-fetch for notes
-    local clone_dir
-    clone_dir="$(mktemp -d)"
+    # Clone and configure auto-fetch for notes (under sandbox)
     git clone "$origin_dir" "$clone_dir" --quiet 2>/dev/null
     cd "$clone_dir"
 
@@ -600,23 +622,20 @@ test_notes_available_after_clone_with_fetch_config() {
     git fetch origin --quiet 2>/dev/null
 
     # Restore should work
-    local restore_dir
-    restore_dir="$(mktemp -d)"
     "$EPHEMERA" restore --dest "$restore_dir" >/dev/null
 
-    local result=0
-    if [[ ! -f "$restore_dir/PLAN.md" ]] || ! grep -q "Plan content" "$restore_dir/PLAN.md"; then
-        result=1
-    fi
-
-    rm -rf "$origin_dir" "$clone_dir" "$restore_dir"
-    return $result
+    [[ -f "$restore_dir/PLAN.md" ]] && grep -q "Plan content" "$restore_dir/PLAN.md"
 }
 
 test_multiple_commits_notes_sync() {
-    # Create origin repo
-    local origin_dir
-    origin_dir="$(mktemp -d)"
+    # Create origin repo under sandbox tmp
+    local origin_dir clone_dir first_restore second_restore
+    origin_dir="$TEST_DIR/tmp/origin3_$$"
+    clone_dir="$TEST_DIR/tmp/clone3_$$"
+    first_restore="$TEST_DIR/tmp/first_restore_$$"
+    second_restore="$TEST_DIR/tmp/second_restore_$$"
+    mkdir -p "$origin_dir" "$clone_dir" "$first_restore" "$second_restore"
+
     git clone --bare . "$origin_dir" --quiet 2>/dev/null
 
     git remote add origin "$origin_dir"
@@ -639,33 +658,19 @@ test_multiple_commits_notes_sync() {
     git push origin master --quiet 2>/dev/null
     "$EPHEMERA" push origin >/dev/null 2>&1
 
-    # Clone and fetch notes
-    local clone_dir
-    clone_dir="$(mktemp -d)"
+    # Clone and fetch notes (under sandbox)
     git clone "$origin_dir" "$clone_dir" --quiet 2>/dev/null
     cd "$clone_dir"
     "$EPHEMERA" fetch origin >/dev/null 2>&1
 
     # Restore from first commit
-    local first_restore
-    first_restore="$(mktemp -d)"
     "$EPHEMERA" restore --commit "$first_sha" --dest "$first_restore" >/dev/null
 
     # Restore from second commit (HEAD)
-    local second_restore
-    second_restore="$(mktemp -d)"
     "$EPHEMERA" restore --dest "$second_restore" >/dev/null
 
-    local result=0
-    if ! grep -q "First PRD" "$first_restore/PRD.md"; then
-        result=1
-    fi
-    if ! grep -q "Second PRD" "$second_restore/PRD.md"; then
-        result=1
-    fi
-
-    rm -rf "$origin_dir" "$clone_dir" "$first_restore" "$second_restore"
-    return $result
+    grep -q "First PRD" "$first_restore/PRD.md" && \
+    grep -q "Second PRD" "$second_restore/PRD.md"
 }
 
 # =============================================================================
@@ -987,6 +992,7 @@ main() {
     run_test test_add_nonstrict_ignores_missing
     run_test test_add_no_paths_fails
     run_test test_add_overwrites_existing_note
+    run_test test_add_rejects_path_traversal
     run_test test_note_format_has_required_fields
     run_test test_payload_is_valid_base64_targz
     run_test test_payload_preserves_file_content
